@@ -24,7 +24,7 @@ import config
 import util
 
 
-def custom_xml_to_json(bucket_name, file_name):
+def convert_xml_to_json(bucket_name, file_name):
     df = sql_context.read.format("com.databricks.spark.xml").option(
         "rowTag", "doc").load("s3a://{0}/{1}".format(bucket_name, file_name))
     flattened = df.withColumn("pre", explode($"djnml.body.text.pre"))
@@ -40,6 +40,12 @@ def custom_xml_to_json(bucket_name, file_name):
     #output_file = file_name.replace('nml','.csv')
     #selectedData.write.format("com.databricks.spark.csv").option(
     #    "header", "true").mode("overwrite").save(output_file)
+
+def run_xml2json_conversion():
+    bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
+    for fileobj in bucket.objects.all():
+        convert_xml_to_json(config.S3_BUCKET_BATCH_RAW, fileobj.key)
+        print(colored("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, fileobj.key), "green"))
 
 
 def write_aws_s3(bucket_name, file_name, df):
@@ -137,7 +143,9 @@ def main():
     sql_context = SQLContext(sc)
 
     start_time = time.time()
-    preprocess_all()
+    #preprocess_all()
+    run_xml2json_conversion()
+
     end_time = time.time()
     print(colored("Preprocessing run time (seconds): {0}".format(end_time - start_time), "magenta"))
 
