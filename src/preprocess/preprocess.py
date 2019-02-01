@@ -14,6 +14,8 @@ from pyspark.conf import SparkConf
 from pyspark.context import SparkContext
 from pyspark.sql import SQLContext
 
+import com.databricks.spark.xml
+
 import nltk
 nltk.download("wordnet")
 from nltk.stem import WordNetLemmatizer
