@@ -28,12 +28,12 @@ def convert_xml_to_json(bucket_name, file_name):
     df = sql_context.read.format("com.databricks.spark.xml").option(
         "rowTag", "doc").load("s3a://{0}/{1}".format(bucket_name, file_name))
     flattened = df.withColumn("pre", explode("djnml.body.text.pre"))
-    selectedData = flattened.select("_transmission-date" as "transmission-date",
-        "djnml.head.docdata.djn.djn-newswire.djn-mdata._hot" as "hot",
-        "djnml.head.docdata.djn.djn-newswire.djn-urgency" as "urgency",
-        "djnml.head.docdata.djn.djn-newswire.djn-mdata._display-date" as "display-date",
-        "djnml.body.headline" as "headline",
-        "djnml.body.text" as "text")
+    selectedData = flattened.select("_transmission-date",
+        "djnml.head.docdata.djn.djn-newswire.djn-mdata._hot",
+        "djnml.head.docdata.djn.djn-newswire.djn-urgency",
+        "djnml.head.docdata.djn.djn-newswire.djn-mdata._display-date",
+        "djnml.body.headline",
+        "djnml.body.text")
 
     write_aws_s3(bucket_name, file_name=, selectedData)
     #selectedData.show(3,false)
