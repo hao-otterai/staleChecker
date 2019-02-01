@@ -13,9 +13,9 @@ NUM_SYNONYMS = 0  # num closest synonyms to add to token vector
 
 
 # AWS settings
-S3_BUCKET_BATCH_PREPROCESSED = "s3a://my-bucket-dowjones/batch"
-S3_BUCKET_BATCH_RAW = "s3a://my-bucket-dowjones/raw"
-S3_BUCKET_STREAM = "s3a://my-bucket-dowjones/stream"
+S3_BUCKET_BATCH_PREPROCESSED = "my-bucket-dowjones/batch"
+S3_BUCKET_BATCH_RAW = "my-bucket-dowjones/raw"
+S3_BUCKET_STREAM = "my-bucket-dowjones/stream"
 
 
 # Kafka settings
