@@ -56,7 +56,6 @@ def get_tri_gram_shingles(tokens):
 
 # Preprocess a data file and upload it
 def preprocess_file(bucket_name, file_name):
-
     #raw_data = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
     #raw_data = spark.read.format("csv").option("header", "true").load("csvfile.csv")
 
@@ -113,7 +112,7 @@ def preprocess_all():
     bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
     for csv_obj in bucket.objects.all():
         preprocess_file(config.S3_BUCKET_BATCH_RAW, csv_obj.key)
-        print("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, csv_obj.key)
+        print("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, csv_obj.key))
 
 def main():
     spark_conf = SparkConf().setAppName("news preprocesser").set("spark.cores.max", "30")
