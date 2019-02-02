@@ -57,29 +57,32 @@ def get_tri_gram_shingles(tokens):
 # Preprocess a data file and upload it
 def preprocess_file(bucket_name, file_name):
 
-    raw_data = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
+    #raw_data = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
+    #raw_data = spark.read.format("csv").option("header", "true").load("csvfile.csv")
+    raw_data = sql_context.textFile("s3a://{0}/{1}".format(bucket_name, file_name))
 
     # Clean question body
-    if(config.LOG_DEBUG): print(colored("[PROCESSING]: Cleaning question body...", "green"))
+    if(config.LOG_DEBUG): print("[PROCESSING]: Cleaning headline and body...")
     clean_body = udf(lambda body: filter_body(body), StringType())
-    partially_cleaned_data = raw_data.withColumn("cleaned_body", clean_body("body"))
+    partially_cleaned_data = raw_data.withColumn("cleaned_body", clean_body("body"))\
+    .withColumn("cleaned_headline", clean_body("headline"))
 
     # Concat cleaned question body and question title to form question vector
-    if (config.LOG_DEBUG): print(colored("[PROCESSING]: Concating question body and question title...", "green"))
-    data = partially_cleaned_data.withColumn("text_body", concat(col("title"), lit(" "), col("body")))
+    if (config.LOG_DEBUG): print("[PROCESSING]: Concating headline and body...")
+    data = partially_cleaned_data.withColumn("text_body", concat(col("cleaned_headline"), lit(" "), col("cleaned_body")))
 
     # Tokenize question title
-    if (config.LOG_DEBUG): print(colored("[PROCESSING]: Tokenizing text vector...", "green"))
+    if (config.LOG_DEBUG): print("[PROCESSING]: Tokenizing text vector...")
     tokenizer = Tokenizer(inputCol="text_body", outputCol="text_body_tokenized")
     tokenized_data = tokenizer.transform(data)
 
     # Remove stop words
-    if (config.LOG_DEBUG): print(colored("[PROCESSING]: Removing stop words...", "green"))
+    if (config.LOG_DEBUG): print("[PROCESSING]: Removing stop words...")
     stop_words_remover = StopWordsRemover(inputCol="text_body_tokenized", outputCol="text_body_stop_words_removed")
     stop_words_removed_data = stop_words_remover.transform(tokenized_data)
 
     # Stem words
-    if (config.LOG_DEBUG): print(colored("[PROCESSING]: Stemming tokenized vector...", "green"))
+    if (config.LOG_DEBUG): print("[PROCESSING]: Stemming tokenized vector...")
     stem = udf(lambda tokens: lemmatize(tokens), ArrayType(StringType()))
     stemmed_data = stop_words_removed_data.withColumn("text_body_stemmed", stem("text_body_stop_words_removed"))
 
@@ -93,11 +96,12 @@ def preprocess_file(bucket_name, file_name):
     final_data.registerTempTable("final_data")
 
     preprocessed_data = sql_context.sql(
-        "SELECT title, body, creation_date, text_body, text_body_stemmed, post_type_id, tags, score, comment_count, view_count, id from final_data"
+        "SELECT title, body, creation_date, text_body, text_body_stemmed, post_type_id, \
+        tags, score, comment_count, view_count, id from final_data"
     )
 
     # Write to AWS
-    if (config.LOG_DEBUG): print(colored("[UPLOAD]: Writing preprocessed data to AWS...", "green"))
+    if (config.LOG_DEBUG): print("[UPLOAD]: Writing preprocessed data to AWS...")
     write_aws_s3(config.S3_BUCKET_BATCH_PREPROCESSED, file_name, preprocessed_data)
 
 
@@ -105,7 +109,7 @@ def preprocess_all():
     bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
     for csv_obj in bucket.objects.all():
         preprocess_file(config.S3_BUCKET_BATCH_RAW, csv_obj.key)
-        print(colored("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, csv_obj.key), "green"))
+        print("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, csv_obj.key)
 
 
 """
@@ -149,7 +153,7 @@ def main():
     preprocess_all()
 
     end_time = time.time()
-    print(colored("Preprocessing run time (seconds): {0}".format(end_time - start_time), "magenta"))
+    print("Preprocessing run time (seconds): {0}".format(end_time - start_time))
 
 
 if(__name__ == "__main__"):
