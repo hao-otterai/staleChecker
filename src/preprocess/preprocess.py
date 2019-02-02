@@ -14,7 +14,7 @@ from pyspark.conf import SparkConf
 from pyspark.context import SparkContext
 from pyspark.sql import SQLContext
 
-import com.databricks.spark.xml
+#import com.databricks.spark.xml
 
 import nltk
 nltk.download("wordnet")
@@ -24,30 +24,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib")
 import config
 import util
-
-
-def convert_xml_to_json(bucket_name, file_name):
-    df = sql_context.read.format("com.databricks.spark.xml").option(
-        "rowTag", "doc").load("s3a://{0}/{1}".format(bucket_name, file_name))
-    flattened = df.withColumn("pre", explode("djnml.body.text.pre"))
-    selectedData = flattened.select("_transmission-date",
-        "djnml.head.docdata.djn.djn-newswire.djn-mdata._hot",
-        "djnml.head.docdata.djn.djn-newswire.djn-urgency",
-        "djnml.head.docdata.djn.djn-newswire.djn-mdata._display-date",
-        "djnml.body.headline",
-        "djnml.body.text")
-
-    write_aws_s3(bucket_name, file_name=, selectedData)
-    #selectedData.show(3,false)
-    #output_file = file_name.replace('nml','.csv')
-    #selectedData.write.format("com.databricks.spark.csv").option(
-    #    "header", "true").mode("overwrite").save(output_file)
-
-def run_xml2json_conversion():
-    bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
-    for fileobj in bucket.objects.all():
-        convert_xml_to_json(config.S3_BUCKET_BATCH_RAW, fileobj.key)
-        print("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, fileobj.key))
 
 
 def write_aws_s3(bucket_name, file_name, df):
@@ -132,9 +108,32 @@ def preprocess_all():
         print(colored("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, csv_obj.key), "green"))
 
 
-def main():
+"""
+def convert_xml_to_json(bucket_name, file_name):
+    df = sql_context.read.format("com.databricks.spark.xml").option(
+        "rowTag", "doc").load("s3a://{0}/{1}".format(bucket_name, file_name))
+    flattened = df.withColumn("pre", explode("djnml.body.text.pre"))
+    selectedData = flattened.select("_transmission-date",
+        "djnml.head.docdata.djn.djn-newswire.djn-mdata._hot",
+        "djnml.head.docdata.djn.djn-newswire.djn-urgency",
+        "djnml.head.docdata.djn.djn-newswire.djn-mdata._display-date",
+        "djnml.body.headline",
+        "djnml.body.text")
 
-    # spark = SQLContext.getOrCreate(SparkContext.getOrCreate())
+    write_aws_s3(bucket_name, file_name=, selectedData)
+    #selectedData.show(3,false)
+    #output_file = file_name.replace('nml','.csv')
+    #selectedData.write.format("com.databricks.spark.csv").option(
+    #    "header", "true").mode("overwrite").save(output_file)
+
+def run_xml2json_conversion():
+    bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
+    for fileobj in bucket.objects.all():
+        convert_xml_to_json(config.S3_BUCKET_BATCH_RAW, fileobj.key)
+        print("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, fileobj.key))
+"""
+
+def main():
     spark_conf = SparkConf().setAppName("news preprocesser").set("spark.cores.max", "30")
 
     global sc
@@ -147,8 +146,7 @@ def main():
     sql_context = SQLContext(sc)
 
     start_time = time.time()
-    #preprocess_all()
-    run_xml2json_conversion()
+    preprocess_all()
 
     end_time = time.time()
     print(colored("Preprocessing run time (seconds): {0}".format(end_time - start_time), "magenta"))
