@@ -59,17 +59,22 @@ def preprocess_file(bucket_name, file_name):
 
     #raw_data = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
     #raw_data = spark.read.format("csv").option("header", "true").load("csvfile.csv")
-    raw_data = sql_context.textFile("s3a://{0}/{1}".format(bucket_name, file_name))
+
+    raw_data = sc.textFile("s3a://{0}/{1}".format(bucket_name, file_name))
+    header = raw_data.first()
+    raw_data = raw_data.filter(lambda line: line != header)
+    #raw_data.take(10)
+    raw_data = raw_data.map(lambda k: k.split(",")).toDF(header.split(","))
+    #raw_data.show()
 
     # Clean question body
     if(config.LOG_DEBUG): print("[PROCESSING]: Cleaning headline and body...")
     clean_body = udf(lambda body: filter_body(body), StringType())
-    partially_cleaned_data = raw_data.withColumn("cleaned_body", clean_body("body"))\
-    .withColumn("cleaned_headline", clean_body("headline"))
+    partially_cleaned_data = raw_data.withColumn("cleaned_body", clean_body("body"))
 
     # Concat cleaned question body and question title to form question vector
     if (config.LOG_DEBUG): print("[PROCESSING]: Concating headline and body...")
-    data = partially_cleaned_data.withColumn("text_body", concat(col("cleaned_headline"), lit(" "), col("cleaned_body")))
+    data = partially_cleaned_data.withColumn("text_body", concat(col("headline"), lit(" "), col("cleaned_body")))
 
     # Tokenize question title
     if (config.LOG_DEBUG): print("[PROCESSING]: Tokenizing text vector...")
@@ -96,7 +101,7 @@ def preprocess_file(bucket_name, file_name):
     final_data.registerTempTable("final_data")
 
     preprocessed_data = sql_context.sql(
-        "SELECT title, body, creation_date, text_body, text_body_stemmed, post_type_id, \
+        "SELECT headline, body, text_body, text_body_stemmed, \
         tags, score, comment_count, view_count, id from final_data"
     )
 
@@ -111,31 +116,29 @@ def preprocess_all():
         preprocess_file(config.S3_BUCKET_BATCH_RAW, csv_obj.key)
         print("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, csv_obj.key)
 
+# def convert_xml_to_json(bucket_name, file_name):
+#     df = sql_context.read.format("com.databricks.spark.xml").option(
+#         "rowTag", "doc").load("s3a://{0}/{1}".format(bucket_name, file_name))
+#     flattened = df.withColumn("pre", explode("djnml.body.text.pre"))
+#     selectedData = flattened.select("_transmission-date",
+#         "djnml.head.docdata.djn.djn-newswire.djn-mdata._hot",
+#         "djnml.head.docdata.djn.djn-newswire.djn-urgency",
+#         "djnml.head.docdata.djn.djn-newswire.djn-mdata._display-date",
+#         "djnml.body.headline",
+#         "djnml.body.text")
+#
+#     write_aws_s3(bucket_name, file_name=, selectedData)
+#     #selectedData.show(3,false)
+#     #output_file = file_name.replace('nml','.csv')
+#     #selectedData.write.format("com.databricks.spark.csv").option(
+#     #    "header", "true").mode("overwrite").save(output_file)
+#
+# def run_xml2json_conversion():
+#     bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
+#     for fileobj in bucket.objects.all():
+#         convert_xml_to_json(config.S3_BUCKET_BATCH_RAW, fileobj.key)
+#         print("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, fileobj.key))
 
-"""
-def convert_xml_to_json(bucket_name, file_name):
-    df = sql_context.read.format("com.databricks.spark.xml").option(
-        "rowTag", "doc").load("s3a://{0}/{1}".format(bucket_name, file_name))
-    flattened = df.withColumn("pre", explode("djnml.body.text.pre"))
-    selectedData = flattened.select("_transmission-date",
-        "djnml.head.docdata.djn.djn-newswire.djn-mdata._hot",
-        "djnml.head.docdata.djn.djn-newswire.djn-urgency",
-        "djnml.head.docdata.djn.djn-newswire.djn-mdata._display-date",
-        "djnml.body.headline",
-        "djnml.body.text")
-
-    write_aws_s3(bucket_name, file_name=, selectedData)
-    #selectedData.show(3,false)
-    #output_file = file_name.replace('nml','.csv')
-    #selectedData.write.format("com.databricks.spark.csv").option(
-    #    "header", "true").mode("overwrite").save(output_file)
-
-def run_xml2json_conversion():
-    bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
-    for fileobj in bucket.objects.all():
-        convert_xml_to_json(config.S3_BUCKET_BATCH_RAW, fileobj.key)
-        print("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, fileobj.key))
-"""
 
 def main():
     spark_conf = SparkConf().setAppName("news preprocesser").set("spark.cores.max", "30")
