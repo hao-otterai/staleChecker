@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # cluster
-$SPARK_HOME/bin/spark-submit --master spark://ip-10-0-0-4:7077 \
+$SPARK_HOME/bin/spark-submit --master spark://ip-10-0-0-10:7077 \
 --conf spark.yarn.executor.memoryOverhead=600 \
 --executor-memory 6G \
 --driver-memory 6G preprocess.py

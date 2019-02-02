@@ -2,7 +2,6 @@ import sys
 import os
 import redis
 import time
-from termcolor import colored
 
 from pyspark.conf import SparkConf
 from pyspark.context import SparkContext
@@ -41,14 +40,14 @@ def run_minhash_lsh():
     vectorizer = VectorAssembler(inputCols=["raw_features"], outputCol="text_body_vectorized")
     vdf = vectorizer.transform(htf_df)
 
-    if(config.LOG_DEBUG): print(colored("[MLLIB BATCH]: Fitting MinHashLSH model...", "green"))
+    if(config.LOG_DEBUG): print("[MLLIB BATCH]: Fitting MinHashLSH model...")
     model = mh.fit(vdf)
     model.transform(vdf).show()
 
     # Approximate similarity join between pairwise elements
     find_tag = udf(lambda x, y: util.common_tag(x, y), StringType())
 
-    if(config.LOG_DEBUG): print(colored("[MLLIB BATCH]: Computing approximate similarity join...", "green"))
+    if(config.LOG_DEBUG): print("[MLLIB BATCH]: Computing approximate similarity join...")
     sim_join = model.approxSimilarityJoin(vdf, vdf, config.DUP_QUESTION_MIN_HASH_THRESHOLD, distCol="jaccard_sim").select(
         col("datasetA.id").alias("q1_id"),
         col("datasetB.id").alias("q2_id"),
@@ -76,7 +75,7 @@ def main():
     start_time = time.time()
     run_minhash_lsh()
     end_time = time.time()
-    print(colored("Spark MLLib MinHashLSH run time (seconds): {0}".format(end_time - start_time), "magenta"))
+    print("Spark MLLib MinHashLSH run time (seconds): {0}".format(end_time - start_time))
 
 
 if(__name__ == "__main__"):

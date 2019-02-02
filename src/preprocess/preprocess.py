@@ -41,6 +41,7 @@ def lemmatize(tokens):
 def filter_body(body):
     remove_code = re.sub('<[^>]+>', '', body)
     remove_punctuation = re.sub(r"[^\w\s]", " ", remove_code)
+    remove_numerical = re.sub(r"[^-?0-9]+", " ")
     remove_spaces = remove_punctuation.replace("\n", " ")
     return remove_spaces.encode('ascii', 'ignore')
 

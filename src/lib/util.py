@@ -5,7 +5,6 @@ import botocore
 import time
 import pickle
 
-from termcolor import colored
 from functools import reduce
 
 from pyspark.sql import DataFrame
@@ -25,8 +24,8 @@ def common_tag(x, y):
 
 # Reads all JSON files from an AWS bucket
 def read_all_json_from_bucket(sql_context, bucket_name):
-    if(config.LOG_DEBUG): print(colored("[BATCH]: Reading S3 files to master dataframe...", "green"))
-    return sql_context.read.json("s3a://{0}/*.json*".format(bucket_name))
+    if(config.LOG_DEBUG): print("[BATCH]: Reading S3 files to master dataframe...")
+    return sql_context.read.json("s3a://{0}/*/*.json*".format(bucket_name))
 
 # Retrieves AWS bucket object
 def get_bucket(bucket_name):
@@ -47,7 +46,7 @@ def time_process(func, process_name):
     start_time = time.time()
     func()
     end_time = time.time()
-    print(colored("{0} run time (seconds): {1}".format(process_name, end_time - start_time), "magenta"))
+    print("{0} run time (seconds): {1}".format(process_name, end_time - start_time))
 
 # Wrappers for loading/saving pickle files
 def load_pickle_file(filepath):

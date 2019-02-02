@@ -2,7 +2,6 @@ import sys
 import os
 import time
 import json
-from termcolor import colored
 
 from pyspark.conf import SparkConf
 from pyspark.context import SparkContext
@@ -61,7 +60,7 @@ def find_dup_cands_within_tags(mh, lsh):
         tq_table_size = rdb.zcard("lsh:{0}".format(tag))
         if(tq_table_size >= config.DUP_QUESTION_MIN_TAG_SIZE):  # Ignore extremely small tags
             tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
-            if config.LOG_DEBUG: print(colored("{0}: {1} question(s)".format(tag, len(tq)), "yellow"))
+            if config.LOG_DEBUG: print("{0}: {1} question(s)".format(tag, len(tq)))
             tq_df = sql_context.read.json(sc.parallelize(tq))
 
             find_lsh_sim = udf(lambda x, y: lsh.common_bands_count(x, y), IntegerType())
@@ -104,11 +103,11 @@ def run_minhash_lsh():
         lsh = util.load_pickle_file(config.LSH_PICKLE)
 
     # Compute MinHash/LSH hashes for every question
-    if (config.LOG_DEBUG): print(colored("[BATCH]: Calculating MinHash hashes and LSH hashes...", "green"))
+    if (config.LOG_DEBUG): print("[BATCH]: Calculating MinHash hashes and LSH hashes...")
     compute_minhash_lsh(df, mh, lsh)
 
     # Compute pairwise LSH similarities for questions within tags
-    if (config.LOG_DEBUG): print(colored("[BATCH]: Fetching questions in same tag, comparing LSH and MinHash, uploading duplicate candidates back to Redis...", "cyan"))
+    if (config.LOG_DEBUG): print("[BATCH]: Fetching questions in same tag, comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
     find_dup_cands_within_tags(mh, lsh)
 
 
@@ -129,7 +128,7 @@ def main():
     start_time = time.time()
     run_minhash_lsh()
     end_time = time.time()
-    print(colored("Spark Custom MinHashLSH run time (seconds): {0} seconds".format(end_time - start_time), "magenta"))
+    print("Spark Custom MinHashLSH run time (seconds): {0} seconds".format(end_time - start_time))
 
 
 if(__name__ == "__main__"):

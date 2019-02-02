@@ -2,7 +2,6 @@ import sys
 import os
 import time
 import json
-#from termcolor import colored
 
 from pyspark.conf import SparkConf
 from pyspark.context import SparkContext
@@ -23,20 +22,12 @@ import util
 def compute_tf_idf(documents):
     hashingTF = HashingTF()
     tf = hashingTF.transform(documents)
-
     # While applying HashingTF only needs a single pass to the data, applying IDF needs two passes:
     # First to compute the IDF vector and second to scale the term frequencies by IDF.
     tf.cache()
-    idf = IDF().fit(tf)
+    idf = IDF(minDocFreq=config.MIN_DOC_FREQ).fit(tf)
     tfidf = idf.transform(tf)
-
-    # spark.mllib's IDF implementation provides an option for ignoring terms
-    # which occur in less than a minimum number of documents.
-    # In such cases, the IDF for these terms is set to 0.
-    # This feature can be used by passing the minDocFreq value to the IDF constructor.
-    idfIgnore = IDF(minDocFreq=2).fit(tf)
-    tfidfIgnore = idfIgnore.transform(tf)
-
+    return tfidf
 
 # Store question data
 def store_lsh_redis(rdd):
@@ -88,10 +79,10 @@ def find_dup_cands_within_tags(model):
         tq_table_size = rdb.zcard("lsh:{0}".format(tag))
         if(tq_table_size >= config.DUP_QUESTION_MIN_TAG_SIZE):  # Ignore extremely small tags
             tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
-            if config.LOG_DEBUG: print(colored("{0}: {1} question(s)".format(tag, len(tq)), "yellow"))
+            if config.LOG_DEBUG: print("{0}: {1} question(s)".format(tag, len(tq)))
             tq_df = sql_context.read.json(sc.parallelize(tq))
 
-            if(config.LOG_DEBUG): print(colored("[MLLIB BATCH]: Computing approximate similarity join...", "green"))
+            if(config.LOG_DEBUG): print("[MLLIB BATCH]: Computing approximate similarity join...")
             find_tag = udf(lambda x, y: util.common_tag(x, y), StringType())
             sim_join = model.approxSimilarityJoin(tq_df, tq_df, config.DUP_QUESTION_MIN_HASH_THRESHOLD, distCol="jaccard_sim").select(
                 col("datasetA.id").alias("q1_id"),
@@ -147,7 +138,7 @@ def main():
     start_time = time.time()
     run_minhash_lsh()
     end_time = time.time()
-    print(colored("Spark Custom MinHashLSH run time (seconds): {0} seconds".format(end_time - start_time), "magenta"))
+    print("Spark Custom MinHashLSH run time (seconds): {0} seconds".format(end_time - start_time))
 
 
 if(__name__ == "__main__"):
