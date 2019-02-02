@@ -2,7 +2,7 @@ import sys
 import os
 import re
 import time
-from termcolor import colored
+#from termcolor import colored
 
 from pyspark.ml.feature import StopWordsRemover
 from pyspark.ml.feature import Tokenizer
@@ -47,7 +47,7 @@ def run_xml2json_conversion():
     bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
     for fileobj in bucket.objects.all():
         convert_xml_to_json(config.S3_BUCKET_BATCH_RAW, fileobj.key)
-        print(colored("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, fileobj.key), "green"))
+        print("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, fileobj.key))
 
 
 def write_aws_s3(bucket_name, file_name, df):
@@ -133,6 +133,8 @@ def preprocess_all():
 
 
 def main():
+
+    # spark = SQLContext.getOrCreate(SparkContext.getOrCreate())
     spark_conf = SparkConf().setAppName("news preprocesser").set("spark.cores.max", "30")
 
     global sc
