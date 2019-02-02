@@ -102,8 +102,7 @@ def preprocess_file(bucket_name, file_name):
 
     preprocessed_data = sql_context.sql(
         "SELECT headline, body, text_body, text_body_stemmed, \
-        hot, transmission_date, display_date, djn_urgency from final_data"
-    )
+        hot, transmission_date, display_date, djn_urgency from final_data")
 
     # Write to AWS
     if (config.LOG_DEBUG): print("[UPLOAD]: Writing preprocessed data to AWS...")
@@ -118,7 +117,6 @@ def preprocess_all():
 
 def main():
     spark_conf = SparkConf().setAppName("news preprocesser").set("spark.cores.max", "30")
-
     global sc
     sc = SparkContext(conf=spark_conf)
     sc.setLogLevel("ERROR")
