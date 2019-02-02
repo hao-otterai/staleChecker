@@ -2,13 +2,13 @@ import sys
 import os
 import time
 import json
-from termcolor import colored
+#from termcolor import colored
 
 from pyspark.conf import SparkConf
 from pyspark.context import SparkContext
 from pyspark.sql import SQLContext
 from pyspark.sql.functions import udf, col
-from pyspark.ml.feature import MinHashLSH, VectorAssembler, HashingTF
+from pyspark.ml.feature import MinHashLSH, VectorAssembler, HashingTF, IDF
 
 import redis
 
@@ -18,6 +18,24 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) +
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib")
 import config
 import util
+
+# calculate TF-IDF
+def compute_tf_idf(documents):
+    hashingTF = HashingTF()
+    tf = hashingTF.transform(documents)
+
+    # While applying HashingTF only needs a single pass to the data, applying IDF needs two passes:
+    # First to compute the IDF vector and second to scale the term frequencies by IDF.
+    tf.cache()
+    idf = IDF().fit(tf)
+    tfidf = idf.transform(tf)
+
+    # spark.mllib's IDF implementation provides an option for ignoring terms
+    # which occur in less than a minimum number of documents.
+    # In such cases, the IDF for these terms is set to 0.
+    # This feature can be used by passing the minDocFreq value to the IDF constructor.
+    idfIgnore = IDF(minDocFreq=2).fit(tf)
+    tfidfIgnore = idfIgnore.transform(tf)
 
 
 # Store question data
@@ -103,11 +121,12 @@ def run_minhash_lsh():
     vectorizer = VectorAssembler(inputCols=["raw_features"], outputCol="text_body_vectorized")
     vdf = vectorizer.transform(htf_df)
 
-    if(config.LOG_DEBUG): print(colored("[MLLIB BATCH]: Fitting MinHashLSH model...", "green"))
+    if(config.LOG_DEBUG): print("[MLLIB BATCH]: Fitting MinHashLSH model...")
     model = mh.fit(vdf)
 
     # Compute pairwise LSH similarities for questions within tags
-    if (config.LOG_DEBUG): print(colored("[BATCH]: Fetching questions in same tag, comparing LSH and MinHash, uploading duplicate candidates back to Redis...", "cyan"))
+    if (config.LOG_DEBUG): print("[BATCH]: Fetching questions in same tag, \
+        comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
     find_dup_cands_within_tags(model)
 
 
