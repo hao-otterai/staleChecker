@@ -25,6 +25,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/
 import config
 import util
 
+from pyspark.sql.functions import unix_timestamp
+
+
 
 def write_aws_s3(bucket_name, file_name, df):
     df.write.save("s3a://{0}/{1}".format(bucket_name, file_name), format="json", mode="overwrite")
@@ -92,16 +95,20 @@ def preprocess_file(bucket_name, file_name):
     stemmed_data = stop_words_removed_data.withColumn("text_body_stemmed", stem("text_body_stop_words_removed"))
 
     # Shingle resulting body
-    # if (config.LOG_DEBUG): print(colored("[PROCESSING] Shingling resulting text body...", "green"))
-    # shingle = udf(lambda tokens: get_two_gram_shingles(tokens), ArrayType(ArrayType(StringType())))
-    # shingled_data = stemmed_data.withColumn("text_body_shingled", shingle("text_body_stemmed"))
+    if (config.LOG_DEBUG): print("[PROCESSING] Shingling resulting text body...")
+    shingle = udf(lambda tokens: get_two_gram_shingles(tokens), ArrayType(ArrayType(StringType())))
+    shingled_data = stemmed_data.withColumn("text_body_shingled", shingle("text_body_stemmed"))
+
+    # timestamp
+    final_data = shingled_data.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
 
     # Extract data that we want
-    final_data = stemmed_data
+    #final_data = shingled_data
     final_data.registerTempTable("final_data")
 
+
     preprocessed_data = sql_context.sql(
-        "SELECT id, headline, body, text_body, text_body_stemmed, hot, display_date, djn_urgency from final_data")
+        "SELECT id, headline, body, text_body, text_body_stemmed, text_body_shingled, hot, display_timestamp, djn_urgency from final_data")
 
     # Write to AWS
     if (config.LOG_DEBUG): print("[UPLOAD]: Writing preprocessed data to AWS...")

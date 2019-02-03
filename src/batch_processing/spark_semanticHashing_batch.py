@@ -43,7 +43,7 @@ def compute_minhash_lsh(df, mh, lsh):
 def store_dup_cand_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for cand in rdd:
-        cand_reformatted = (cand.q1_id, cand.q1_title, cand.q2_id, cand.q2_title, cand.timestamp)
+        cand_reformatted = (cand.q1_id, cand.q1_headline, cand.q2_id, cand.q2_headline, cand.timestamp)
         # Store by time
         rdb.zadd("dup_cand", cand.mh_js, cand_reformatted)
 
