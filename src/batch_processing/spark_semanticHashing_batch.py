@@ -27,7 +27,8 @@ def store_lsh_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for q in rdd:
         q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash})
-        rdb.zadd("lsh", q.display_timestamp, q_json)
+        #rdb.zadd("lsh", q.display_timestamp, q_json)
+        rdb.zadd("lsh", 0, q_json)
 
 
 # Computes MinHashes, LSHes for all in DataFrame
