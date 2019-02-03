@@ -95,13 +95,13 @@ def preprocess_file(bucket_name, file_name):
     stemmed_data = stop_words_removed_data.withColumn("text_body_stemmed", stem("text_body_stop_words_removed"))
 
     # Shingle resulting body
-    if (config.LOG_DEBUG): print("[PROCESSING] Shingling resulting text body...")
-    shingle = udf(lambda tokens: get_two_gram_shingles(tokens), ArrayType(ArrayType(StringType())))
-    shingled_data = stemmed_data.withColumn("text_body_shingled", shingle("text_body_stemmed"))
+    # if (config.LOG_DEBUG): print("[PROCESSING] Shingling resulting text body...")
+    # shingle = udf(lambda tokens: get_two_gram_shingles(tokens), ArrayType(ArrayType(StringType())))
+    # shingled_data = stemmed_data.withColumn("text_body_shingled", shingle("text_body_stemmed"))
 
     # timestamp
     if (config.LOG_DEBUG): print("[PROCESSING]: Formatting unix_timestamp ...")
-    final_data = shingled_data.withColumn("display_timestamp",unix_timestamp(
+    final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp(
                     "display_date", "yyyyMMdd'T'HHmmss.SSS'Z'").cast('timestamp'))
 
     # Extract data that we want
@@ -109,7 +109,7 @@ def preprocess_file(bucket_name, file_name):
     final_data.registerTempTable("final_data")
 
     preprocessed_data = sql_context.sql( "SELECT id, headline, body, text_body, text_body_stemmed, \
-        text_body_shingled, hot, display_timestamp, djn_urgency from final_data")
+        hot, display_timestamp, djn_urgency from final_data")
 
     # Write to AWS
     if (config.LOG_DEBUG): print("[UPLOAD]: Writing preprocessed data to AWS...")

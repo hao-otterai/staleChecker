@@ -19,7 +19,7 @@ import min_hash
 import locality_sensitive_hash
 
 
-# id, headline, body, text_body, text_body_stemmed, text_body_shingled, hot, display_timestamp, djn_urgency
+# id, headline, body, text_body, text_body_stemmed, hot, display_timestamp, djn_urgency
 
 # Store question data
 # NB remove tags
