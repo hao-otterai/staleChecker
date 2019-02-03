@@ -116,7 +116,9 @@ def preprocess_file(bucket_name, file_name):
     if (config.LOG_DEBUG): print("[UPLOAD]: Writing preprocessed data to AWS...")
     write_aws_s3(config.S3_BUCKET_BATCH_PREPROCESSED, file_name, preprocessed_data)
 
-    if (config.LOG_DEBUG): final_data.take(10).show()
+    if (config.LOG_DEBUG):
+        print("[debug] show 5 random samples of final data")
+        print(final_data.sample(False, 0.05, seed=0).limit(5))
 
 def preprocess_all():
     bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
