@@ -19,13 +19,15 @@ import min_hash
 import locality_sensitive_hash
 
 
+# id, headline, body, text_body, text_body_stemmed, text_body_shingled, hot, display_timestamp, djn_urgency
+
 # Store question data
 # NB remove tags
 def store_lsh_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for q in rdd:
-        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash, "timestamp": q.display_date})
-        rdb.zadd("lsh", q_json)
+        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash})
+        rdb.zadd("lsh", q.display_timestamp, q_json)
 
 
 # Computes MinHashes, LSHes for all in DataFrame
