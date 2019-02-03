@@ -117,7 +117,7 @@ def preprocess_file(bucket_name, file_name):
 
     if (config.LOG_DEBUG):
         print("[debug] show 5 random samples of final data")
-        final_data.sample(False, 0.1, seed=0).limit(5).foreach(print)
+        final_data.sample(False, 0.1, seed=0).limit(5).foreach(lambda x: print(x))
 
 def preprocess_all():
     bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
