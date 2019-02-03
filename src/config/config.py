@@ -17,16 +17,15 @@ S3_BUCKET_BATCH_PREPROCESSED = "my-bucket-dowjones-batch"
 S3_BUCKET_BATCH_RAW = "my-bucket-dowjones-raw"
 S3_BUCKET_STREAM = "my-bucket-dowjones-stream"
 
-
 # Kafka settings
-KAFKA_SERVERS = ""  # ip:port for kafka brokers
-KAFKA_PRODUCER_RATE = 0  # seconds
-KAFKA_TOPIC = ""
-KAFKA_CONSUMER_REFRESH = 0  # seconds
+KAFKA_SERVERS = "ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092,ec2-35-161-10-145.us-west-2.compute.amazonaws.com:9092,ec2-34-210-190-100.us-west-2.compute.amazonaws.com:9092"  # ip:port for kafka brokers
+KAFKA_PRODUCER_RATE = 0.05  # seconds
+KAFKA_TOPIC = "test1"
+KAFKA_CONSUMER_REFRESH = 0.05  # seconds
 
 
 # Spark settings - streaming, batch
-SPARK_STREAMING_MINI_BATCH_WINDOW = 0  # seconds
+SPARK_STREAMING_MINI_BATCH_WINDOW = 0.05  # seconds
 
 
 # Redis settings
@@ -38,7 +37,7 @@ MIN_HASH_K_VALUE = 100
 LSH_NUM_BANDS = 20
 LSH_BAND_WIDTH = 5
 LSH_NUM_BUCKETS = 1000
-LSH_SIMILARITY_BAND_COUNT = 0  # Number of common bands needed for MinHash comparison
+LSH_SIMILARITY_BAND_COUNT = 400  # Number of common bands needed for MinHash comparison
 
 
 # Dump files to synchronize models across spark streaming/batch

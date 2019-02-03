@@ -4,7 +4,7 @@ import smart_open
 import kafka
 import time
 import threading
-from termcolor import colored
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib")
 import config
@@ -27,8 +27,7 @@ class Producer(threading.Thread):
 def main():
     producer = Producer()
     producer.start()
-    print(colored("Starting Kafka Producer: Ingesting at {0} events per second...".format(
-                1.0 / (config.KAFKA_PRODUCER_RATE)), "green"))
+    print("Starting Kafka Producer: Ingesting at {0} events per second...".format(1.0 / (config.KAFKA_PRODUCER_RATE)))
 
 
 if __name__ == "__main__":

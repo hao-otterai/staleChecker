@@ -101,7 +101,7 @@ def preprocess_file(bucket_name, file_name):
     final_data.registerTempTable("final_data")
 
     preprocessed_data = sql_context.sql(
-        "SELECT headline, body, text_body, text_body_stemmed, \
+        "SELECT id, headline, body, text_body, text_body_stemmed, \
         hot, transmission_date, display_date, djn_urgency from final_data")
 
     # Write to AWS
