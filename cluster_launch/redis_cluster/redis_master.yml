@@ -1,10 +1,10 @@
 purchase_type: on_demand
-subnet_id: subnet-60e34e2b
+subnet_id: subnet-0575f8eb61fe60a17
 num_instances: 1
-key_name: Kellie-Lu-key-pair
-security_group_ids: sg-bac280c4
+key_name: haoyang-IAM-keypair
+security_group_ids: sg-0d95d177454d1b26e
 instance_type: m4.large
-tag_name: kellie-redis-cluster
+tag_name: redis-cluster
 vol_size: 100
 role: master
 use_eips: true

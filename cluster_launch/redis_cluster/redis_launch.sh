@@ -13,10 +13,10 @@ peg install ${CLUSTER_NAME} aws
 peg install ${CLUSTER_NAME} environment
 peg install ${CLUSTER_NAME} redis
 
-wait 
+wait
 peg sshcmd-cluster ${CLUSTER_NAME} "sudo apt install redis-server"
 
-wait 
+wait
 peg sshcmd-cluster ${CLUSTER_NAME} "sudo apt install redis-tools"
 
 wait
