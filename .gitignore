@@ -2,3 +2,4 @@ internal/
 data/
 *.scala
 src/**/*.pyc
+src/**/*.pickle
