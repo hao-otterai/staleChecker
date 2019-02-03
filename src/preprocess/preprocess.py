@@ -44,7 +44,7 @@ def lemmatize(tokens):
 def filter_body(body):
     remove_code = re.sub('<[^>]+>', '', body)
     remove_punctuation = re.sub(r"[^\w\s]", " ", remove_code)
-    remove_numerical = re.sub(r"[^-?0-9]+", " ", remove_punctuation)
+    remove_numerical = re.sub(r"[-?0-9]+", " ", remove_punctuation)
     remove_spaces = remove_numerical.replace("\n", " ")
     return remove_spaces.encode('ascii', 'ignore')
 
@@ -101,7 +101,8 @@ def preprocess_file(bucket_name, file_name):
 
     # timestamp
     if (config.LOG_DEBUG): print("[PROCESSING]: Formatting unix_timestamp ...")
-    final_data = shingled_data.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
+    final_data = shingled_data.withColumn("display_timestamp",unix_timestamp(
+                    "display_date", "yyyyMMdd'T'HHmmss.SSS'Z'").cast('timestamp'))
 
     # Extract data that we want
     #final_data = shingled_data
@@ -115,6 +116,7 @@ def preprocess_file(bucket_name, file_name):
     if (config.LOG_DEBUG): print("[UPLOAD]: Writing preprocessed data to AWS...")
     write_aws_s3(config.S3_BUCKET_BATCH_PREPROCESSED, file_name, preprocessed_data)
 
+    if (config.LOG_DEBUG): final_data.take(10).show()
 
 def preprocess_all():
     bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
