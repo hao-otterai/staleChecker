@@ -108,8 +108,7 @@ def preprocess_file(bucket_name, file_name):
     #final_data = shingled_data
     final_data.registerTempTable("final_data")
 
-    preprocessed_data = sql_context.sql(
-        "SELECT id, headline, body, text_body, text_body_tokenized, text_body_stemmed, \
+    preprocessed_data = sql_context.sql( "SELECT id, headline, body, text_body, text_body_stemmed, \
         text_body_shingled, hot, display_timestamp, djn_urgency from final_data")
 
     # Write to AWS
@@ -118,7 +117,7 @@ def preprocess_file(bucket_name, file_name):
 
     if (config.LOG_DEBUG):
         print("[debug] show 5 random samples of final data")
-        print(final_data.sample(False, 0.05, seed=0).limit(5))
+        final_data.sample(False, 0.05, seed=0).limit(5).foreach(println)
 
 def preprocess_all():
     bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
