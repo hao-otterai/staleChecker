@@ -71,7 +71,7 @@ def preprocess_file(bucket_name, file_name):
     #raw_data.take(10)
     raw_data = raw_data.map(lambda k: k.split(",")).toDF(header.split(","))
     #raw_data.show()
-    raw_data.printSchema()
+    if (config.LOG_DEBUG): raw_data.printSchema()
 
     # Clean question body
     if(config.LOG_DEBUG): print("[PROCESSING]: Cleaning headline and body...")
@@ -117,6 +117,7 @@ def preprocess_file(bucket_name, file_name):
     final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp(
                     "display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
 
+    if (config.LOG_DEBUG): final_data.printSchema()
     # Extract data that we want
     #final_data = shingled_data
     final_data.registerTempTable("final_data")
