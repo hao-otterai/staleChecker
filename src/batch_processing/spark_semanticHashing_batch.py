@@ -26,9 +26,7 @@ import locality_sensitive_hash
 def store_lsh_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for q in rdd:
-        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash,
-        "display_date": q.display_date, "timestamp": q.display_timestamp })
-        ### consider trying this: https://stackoverflow.com/questions/36738006/python-redis-get-list-based-on-timestamp
+        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
         rdb.zadd("pre_cal_mh_lsh", q.display_timestamp, q_json)
         #rdb.sadd("pre_cal_mh_lsh", q_json)
         #rdb.append("lsh", q_json)
@@ -49,7 +47,7 @@ def compute_minhash_lsh(df, mh, lsh):
 def store_dup_cand_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for cand in rdd:
-        cand_reformatted = (cand.q1_id, cand.q1_headline, cand.q2_id, cand.q2_headline, cand.q1_display_date, cand.q2_display_date)
+        cand_reformatted = (cand.q1_id, cand.q1_headline, cand.q2_id, cand.q2_headline, cand.q1_timestamp, cand.q2_timestamp)
         # Store by time
         rdb.zadd("dup_cand", cand.mh_js, cand_reformatted)
 
@@ -66,23 +64,21 @@ def find_dup_cands(mh, lsh):
     tq_df = sql_context.read.json(sc.parallelize(tq))
 
     find_lsh_sim = udf(lambda x, y: lsh.common_bands_count(x, y), IntegerType())
-    join_cond = [col("q2.timestamp") > col("q1.timestamp"),  col("q2.timestamp") < col("q1.timestamp") + config.TIME_WINDOW ]
-    lsh_sim_df = tq_df.alias("q1").join(tq_df.alias("q2"), join_cond).select(
+    lsh_sim_df = tq_df.alias("q1").join(tq_df.alias("q2"), col("q1.timestamp") < col("q2.timestamp")).select(
         col("q1.id").alias("q1_id"),
         col("q2.id").alias("q2_id"),
         col("q1.min_hash").alias("q1_min_hash"),
         col("q2.min_hash").alias("q2_min_hash"),
         col("q1.headline").alias("q1_headline"),
         col("q2.headline").alias("q2_headline"),
-        col("q1.display_date").alias("q1_display_date"),
-        col("q2.display_date").alias("q2_display_date"),
         col("q1.timestamp").alias("q1_timestamp"),
         col("q2.timestamp").alias("q2_timestamp"),
         find_lsh_sim("q1.lsh_hash", "q2.lsh_hash").alias("lsh_sim")
     ).sort("q1_timestamp", "q2_timestamp")
 
     # Duplicate candidates have a high enough LSH similarity count
-    lsh_cand_df = lsh_sim_df.filter(lsh_sim_df.lsh_sim >= config.LSH_SIMILARITY_BAND_COUNT)
+    lsh_cand_df = lsh_sim_df.filter(lsh_sim_df.lsh_sim >= config.LSH_SIMILARITY_BAND_COUNT).filter(
+            lsh_sim_df.q2_timestamp - lsh_sim_df.q1_timestamp <= config.TIME_WINDOW)
 
     # Compare MinHash jaccard similarity scores for duplicate candidates
     find_mh_js = udf(lambda x, y: mh.jaccard_sim_score(x, y))

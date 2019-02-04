@@ -37,7 +37,7 @@ MIN_HASH_K_VALUE = 150
 LSH_NUM_BANDS = 30
 LSH_BAND_WIDTH = 5
 LSH_NUM_BUCKETS = 1000
-LSH_SIMILARITY_BAND_COUNT = 500  # Number of common bands needed for MinHash comparison
+LSH_SIMILARITY_BAND_COUNT = 800  # Number of common bands needed for MinHash comparison
 
 
 # Dump files to synchronize models across spark streaming/batch
@@ -46,7 +46,7 @@ LSH_PICKLE = SRC_PATH + "/lib/lsh.pickle"
 
 
 # Duplicate question settings
-DUP_QUESTION_MIN_HASH_THRESHOLD = 0.6
+DUP_QUESTION_MIN_HASH_THRESHOLD = 0.65
 DUP_QUESTION_MIN_TAG_SIZE = 0
 DUP_QUESTION_IDENTIFY_THRESHOLD = 0
 QUESTION_POPULARITY_THRESHOLD = 0
