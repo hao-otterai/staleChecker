@@ -112,7 +112,7 @@ def preprocess_file(bucket_name, file_name):
     if (config.LOG_DEBUG): print("[PROCESSING]: Formatting unix_timestamp ...")
     # final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp(
     #                 "display_date", "yyyyMMdd'T'HHmmss.SSS'Z'").cast('timestamp'))
-    final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp(
+    final_data = tagged_data.withColumn("display_timestamp",unix_timestamp(
                     "display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
 
     # Extract data that we want
