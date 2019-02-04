@@ -26,10 +26,7 @@ import locality_sensitive_hash
 def store_lsh_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for q in rdd:
-        q_json = json.dumps({"id": q.id, "headline": q.headline,
-                            "min_hash": q.min_hash, "lsh_hash": q.lsh_hash,
-                            "display_date": q.display_date})
-
+        q_json = json.dumps({"headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash, "timestamp": q.display_date }) #"id": q.id,
         ### consider trying this: https://stackoverflow.com/questions/36738006/python-redis-get-list-based-on-timestamp
         #rdb.zadd("lsh", q_json=q.display_timestamp)
         rdb.sadd("lsh", q_json)
