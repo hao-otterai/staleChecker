@@ -54,3 +54,6 @@ QUESTION_POPULARITY_THRESHOLD = 0
 
 # TF-idf
 MIN_DOC_FREQ = 2
+
+# time window for news similarity search
+TIME_WINDOW = 432000 #3600*24*3

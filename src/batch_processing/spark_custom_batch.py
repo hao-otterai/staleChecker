@@ -72,7 +72,8 @@ def find_dup_cands_within_tags(mh, lsh):
                 col("q2.min_hash").alias("q2_min_hash"),
                 col("q1.title").alias("q1_title"),
                 col("q2.title").alias("q2_title"),
-                col("q1.timestamp").alias("timestamp"),
+                col("q1.timestamp").alias("q1_timestamp"),
+                col("q1.timestamp").alias("q2_timestamp"),
                 find_lsh_sim("q1.lsh_hash", "q2.lsh_hash").alias("lsh_sim")
             ).sort("q1_id", "q2_id")
 
