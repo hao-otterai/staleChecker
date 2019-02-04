@@ -31,7 +31,7 @@ def store_lsh_redis(rdd):
                             "display_date": q.display_date})
 
         ### consider trying this: https://stackoverflow.com/questions/36738006/python-redis-get-list-based-on-timestamp
-        rdb.zadd("lsh", q.display_timestamp, q_json)
+        rdb.zadd("lsh", q_json=q.display_timestamp)
         #rdb.append("lsh", q_json)
 
 
