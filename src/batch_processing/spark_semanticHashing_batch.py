@@ -77,8 +77,8 @@ def find_dup_cands(mh, lsh):
     ).sort("q1_timestamp", "q2_timestamp")
 
     # Duplicate candidates have a high enough LSH similarity count
-    lsh_cand_df = lsh_sim_df.filter(lsh_sim_df.lsh_sim >= config.LSH_SIMILARITY_BAND_COUNT).filter(
-            lsh_sim_df.q2_timestamp - lsh_sim_df.q1_timestamp <= config.TIME_WINDOW)
+    lsh_cand_df = lsh_sim_df.filter(lsh_sim_df.lsh_sim >= config.LSH_SIMILARITY_BAND_COUNT)
+    #.filter(lsh_sim_df.q2_timestamp - lsh_sim_df.q1_timestamp <= config.TIME_WINDOW)
 
     # Compare MinHash jaccard similarity scores for duplicate candidates
     find_mh_js = udf(lambda x, y: mh.jaccard_sim_score(x, y))
