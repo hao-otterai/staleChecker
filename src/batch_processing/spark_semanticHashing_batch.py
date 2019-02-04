@@ -28,8 +28,8 @@ def store_lsh_redis(rdd):
     for q in rdd:
         q_json = json.dumps({"headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash, "timestamp": q.display_date }) #"id": q.id,
         ### consider trying this: https://stackoverflow.com/questions/36738006/python-redis-get-list-based-on-timestamp
-        #rdb.zadd("lsh", q_json=q.display_timestamp)
-        rdb.sadd("lsh", q_json)
+        rdb.zadd("pre_cal_mh_lsh", q.display_timestamp, q_json)
+        #rdb.sadd("pre_cal_mh_lsh", q_json)
         #rdb.append("lsh", q_json)
 
 
@@ -57,10 +57,10 @@ def store_dup_cand_redis(rdd):
 def find_dup_cands(mh, lsh):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
-    # Fetch all news
-    #tq = rdb.zrangebyscore("lsh", "-inf", "+inf", withscores=False)
-    ### NB: ideally, sort the news by timestamp, and get within a range of timestamps
-    tq = rdb.smembers("lsh")
+    # Fetch all news. ideally, sort the news by timestamp, and get within a range of timestamps
+    tq = rdb.zrangebyscore("pre_cal_mh_lsh", "-inf", "+inf", withscores=False)
+    #tq = rdb.smembers("pre_cal_mh_lsh")
+
     if config.LOG_DEBUG: print("{0} news".format(len(tq)))
     tq_df = sql_context.read.json(sc.parallelize(tq))
 
