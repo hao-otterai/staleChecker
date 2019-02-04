@@ -77,6 +77,14 @@ def preprocess_file(bucket_name, file_name):
     clean_body = udf(lambda body: filter_body(body), StringType())
     partially_cleaned_data = raw_data.withColumn("cleaned_body", clean_body("body"))
 
+    # generate tags based on company, industry, and market
+    if (config.LOG_DEBUG): print("[PROCESSING]: Generating news tags based on industry, market and company...")
+    tag_generator = udf(lambda input_string: generate_tag(input_string),  ArrayType(StringType()))
+    partially_cleaned_data = partially_cleaned_data.withColumn( "tag_company", tag_generator("company"))
+    partially_cleaned_data = partially_cleaned_data.withColumn( "tag_industry", tag_generator("industry"))
+    partially_cleaned_data = partially_cleaned_data.withColumn( "tag_market", tag_generator("market"))
+
+
     # Concat cleaned question body and question title to form question vector
     if (config.LOG_DEBUG): print("[PROCESSING]: Concating headline and body...")
     data = partially_cleaned_data.withColumn("text_body", concat(col("headline"), lit(" "), col("cleaned_body")))
@@ -101,18 +109,11 @@ def preprocess_file(bucket_name, file_name):
     # shingle = udf(lambda tokens: get_two_gram_shingles(tokens), ArrayType(ArrayType(StringType())))
     # shingled_data = stemmed_data.withColumn("text_body_shingled", shingle("text_body_stemmed"))
 
-    # generate tags based on company, industry, and market
-    if (config.LOG_DEBUG): print("[PROCESSING]: Generating news tags based on industry, market and company...")
-    tag_generator = udf(lambda input_string: generate_tag(input_string),  ArrayType(StringType()))
-    tagged_data = stemmed_data.withColumn("tag_company", tag_generator("company")).withColumn(
-                                        "tag_industry", tag_generator("industry")).withColumn(
-                                        "tag_market", tag_generator("market"))
-
     # timestamp
     if (config.LOG_DEBUG): print("[PROCESSING]: Formatting unix_timestamp ...")
     # final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp(
     #                 "display_date", "yyyyMMdd'T'HHmmss.SSS'Z'").cast('timestamp'))
-    final_data = tagged_data.withColumn("display_timestamp",unix_timestamp(
+    final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp(
                     "display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
 
     # Extract data that we want
