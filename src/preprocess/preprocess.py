@@ -123,8 +123,9 @@ def preprocess_file(bucket_name, file_name):
     final_data.registerTempTable("final_data")
 
     preprocessed_data = sql_context.sql( "SELECT id, headline, body, text_body, text_body_stemmed, \
-        tag_company, tag_industry, tag_market, source, hot, display_date, display_timestamp, djn_urgency from final_data")
-
+        hot, display_date, display_timestamp, djn_urgency from final_data")
+    # tag_company, tag_industry, tag_market, source
+    
     # Write to AWS
     if (config.LOG_DEBUG): print("[UPLOAD]: Writing preprocessed data to AWS...")
     write_aws_s3(config.S3_BUCKET_BATCH_PREPROCESSED, file_name, preprocessed_data)
