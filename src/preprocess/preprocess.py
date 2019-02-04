@@ -77,11 +77,11 @@ def preprocess_file(bucket_name, file_name):
     partially_cleaned_data = raw_data.withColumn("cleaned_body", clean_body("body"))
 
     # generate tags based on company, industry, and market
-    if (config.LOG_DEBUG): print("[PROCESSING]: Generating news tags based on industry, market and company...")
-    tag_generator = udf(lambda input_string: generate_tag(input_string), ArrayType(StringType()))
-    partially_cleaned_data = partially_cleaned_data.withColumn( "tag_company", tag_generator("company"))
-    partially_cleaned_data = partially_cleaned_data.withColumn( "tag_industry", tag_generator("industry"))
-    partially_cleaned_data = partially_cleaned_data.withColumn( "tag_market", tag_generator("market"))
+    # if (config.LOG_DEBUG): print("[PROCESSING]: Generating news tags based on industry, market and company...")
+    # tag_generator = udf(lambda input_string: generate_tag(input_string), ArrayType(StringType()))
+    # partially_cleaned_data = partially_cleaned_data.withColumn( "tag_company", tag_generator("company"))
+    # partially_cleaned_data = partially_cleaned_data.withColumn( "tag_industry", tag_generator("industry"))
+    # partially_cleaned_data = partially_cleaned_data.withColumn( "tag_market", tag_generator("market"))
 
 
     # Concat cleaned question body and question title to form question vector
@@ -112,8 +112,7 @@ def preprocess_file(bucket_name, file_name):
     if (config.LOG_DEBUG): print("[PROCESSING]: Formatting unix_timestamp ...")
     # final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp(
     #                 "display_date", "yyyyMMdd'T'HHmmss.SSS'Z'").cast('timestamp'))
-    final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp(
-                    "display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
+    final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
 
     if (config.LOG_DEBUG): final_data.printSchema()
     # Extract data that we want
@@ -121,7 +120,8 @@ def preprocess_file(bucket_name, file_name):
     final_data.registerTempTable("final_data")
 
     preprocessed_data = sql_context.sql( "SELECT id, headline, body, text_body, text_body_stemmed, \
-        tag_company, tag_industry, tag_market, source, hot, display_date, display_timestamp, djn_urgency from final_data")
+         hot, display_date, display_timestamp, djn_urgency from final_data")
+    #tag_company, tag_industry, tag_market, source,
 
     # Write to AWS
     if (config.LOG_DEBUG): print("[UPLOAD]: Writing preprocessed data to AWS...")
