@@ -31,7 +31,8 @@ def store_lsh_redis(rdd):
                             "display_date": q.display_date})
 
         ### consider trying this: https://stackoverflow.com/questions/36738006/python-redis-get-list-based-on-timestamp
-        rdb.zadd("lsh", q_json=q.display_timestamp)
+        #rdb.zadd("lsh", q_json=q.display_timestamp)
+        rdb.sadd("lsh", q_json)
         #rdb.append("lsh", q_json)
 
 
@@ -60,8 +61,9 @@ def find_dup_cands(mh, lsh):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
     # Fetch all news
-    tq = rdb.zrangebyscore("lsh", "-inf", "+inf", withscores=False)
-    #tq = rdb.get("lsh")
+    #tq = rdb.zrangebyscore("lsh", "-inf", "+inf", withscores=False)
+    ### NB: ideally, sort the news by timestamp, and get within a range of timestamps
+    tq = rdb.smembers("lsh")
     if config.LOG_DEBUG: print("{0} news".format(len(tq)))
     tq_df = sql_context.read.json(sc.parallelize(tq))
 
