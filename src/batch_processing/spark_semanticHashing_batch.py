@@ -64,7 +64,9 @@ def find_dup_cands(mh, lsh):
     tq_df = sql_context.read.json(sc.parallelize(tq))
 
     find_lsh_sim = udf(lambda x, y: lsh.common_bands_count(x, y), IntegerType())
-    lsh_sim_df = tq_df.alias("q1").join(tq_df.alias("q2"), col("q1.timestamp") < col("q2.timestamp")).select(
+    lsh_sim_df = tq_df.alias("q1").join(tq_df.alias("q2"),
+        [col("q1.timestamp") < col("q2.timestamp"),
+        col("q2.timestamp") - col("q1.timestamp") < config.TIME_WINDOW]).select(
         col("q1.id").alias("q1_id"),
         col("q2.id").alias("q2_id"),
         col("q1.min_hash").alias("q1_min_hash"),
@@ -78,7 +80,6 @@ def find_dup_cands(mh, lsh):
 
     # Duplicate candidates have a high enough LSH similarity count
     lsh_cand_df = lsh_sim_df.filter(lsh_sim_df.lsh_sim >= config.LSH_SIMILARITY_BAND_COUNT)
-    #.filter(lsh_sim_df.q2_timestamp - lsh_sim_df.q1_timestamp <= config.TIME_WINDOW)
 
     # Compare MinHash jaccard similarity scores for duplicate candidates
     find_mh_js = udf(lambda x, y: mh.jaccard_sim_score(x, y))
