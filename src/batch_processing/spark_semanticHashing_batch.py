@@ -63,6 +63,7 @@ def find_dup_cands(mh, lsh):
     if config.LOG_DEBUG: print("{0} news".format(len(tq)))
     tq_df = sql_context.read.json(sc.parallelize(tq))
 
+    # NB this should be a crossJoin http://spark.apache.org/docs/2.1.0/api/python/pyspark.sql.html
     find_lsh_sim = udf(lambda x, y: lsh.common_bands_count(x, y), IntegerType())
     lsh_sim_df = tq_df.alias("q1").join(tq_df.alias("q2"),
         [col("q1.timestamp") < col("q2.timestamp"),

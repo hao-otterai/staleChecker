@@ -71,6 +71,7 @@ def preprocess_file(bucket_name, file_name):
     #raw_data.take(10)
     raw_data = raw_data.map(lambda k: k.split(",")).toDF(header.split(","))
     #raw_data.show()
+    raw_data.printSchema()
 
     # Clean question body
     if(config.LOG_DEBUG): print("[PROCESSING]: Cleaning headline and body...")
