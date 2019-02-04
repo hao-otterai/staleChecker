@@ -27,8 +27,6 @@ import util
 
 from pyspark.sql.functions import unix_timestamp
 
-
-
 def write_aws_s3(bucket_name, file_name, df):
     df.write.save("s3a://{0}/{1}".format(bucket_name, file_name), format="json", mode="overwrite")
 
@@ -58,7 +56,7 @@ def get_tri_gram_shingles(tokens):
     return [(tokens[i], tokens[i + 1], tokens[i + 2]) for i in range(len(tokens) - 2)]
 
 def generate_tag(input_string):
-    return input_string if len(input_string)>0 else '<unspecified>'
+    return input_string.split("||") if len(input_string)>0 else ['<unspecified>']
 
 # Preprocess a data file and upload it
 def preprocess_file(bucket_name, file_name):
@@ -80,7 +78,7 @@ def preprocess_file(bucket_name, file_name):
 
     # generate tags based on company, industry, and market
     if (config.LOG_DEBUG): print("[PROCESSING]: Generating news tags based on industry, market and company...")
-    tag_generator = udf(lambda input_string: generate_tag(input_string), StringType())
+    tag_generator = udf(lambda input_string: generate_tag(input_string), ArrayType(StringType()))
     partially_cleaned_data = partially_cleaned_data.withColumn( "tag_company", tag_generator("company"))
     partially_cleaned_data = partially_cleaned_data.withColumn( "tag_industry", tag_generator("industry"))
     partially_cleaned_data = partially_cleaned_data.withColumn( "tag_market", tag_generator("market"))
@@ -123,9 +121,8 @@ def preprocess_file(bucket_name, file_name):
     final_data.registerTempTable("final_data")
 
     preprocessed_data = sql_context.sql( "SELECT id, headline, body, text_body, text_body_stemmed, \
-        hot, display_date, display_timestamp, djn_urgency from final_data")
-    # tag_company, tag_industry, tag_market, source
-    
+        tag_company, tag_industry, tag_market, source, hot, display_date, display_timestamp, djn_urgency from final_data")
+
     # Write to AWS
     if (config.LOG_DEBUG): print("[UPLOAD]: Writing preprocessed data to AWS...")
     write_aws_s3(config.S3_BUCKET_BATCH_PREPROCESSED, file_name, preprocessed_data)
