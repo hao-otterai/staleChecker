@@ -60,14 +60,14 @@ def get_tri_gram_shingles(tokens):
 
 # Preprocess a data file and upload it
 def preprocess_file(bucket_name, file_name):
-    #raw_data = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
+    raw_data = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
     #raw_data = spark.read.format("csv").option("header", "true").load("csvfile.csv")
 
-    raw_data = sc.textFile("s3a://{0}/{1}".format(bucket_name, file_name))
-    header = raw_data.first()
-    raw_data = raw_data.filter(lambda line: line != header)
-    #raw_data.take(10)
-    raw_data = raw_data.map(lambda k: k.split(",")).toDF(header.split(","))
+    # raw_data = sc.textFile("s3a://{0}/{1}".format(bucket_name, file_name))
+    # header = raw_data.first()
+    # raw_data = raw_data.filter(lambda line: line != header)
+    # #raw_data.take(10)
+    # raw_data = raw_data.map(lambda k: k.split(",")).toDF(header.split(","))
     #raw_data.show()
     if (config.LOG_DEBUG): raw_data.printSchema()
 
