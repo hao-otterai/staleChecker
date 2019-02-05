@@ -64,7 +64,7 @@ def store_spark_mllib_tag_indexed_sim_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for sim in rdd:
         if(sim.jaccard_sim > config.DUP_QUESTION_IDENTIFY_THRESHOLD):
-            q_pair = (sim.tag, sim.q1_id, sim.q1_headline, sim.q2_id, sim.q2_headline, sim.q1_timestamp, sim.q2_timestamp)
+            q_pair = (sim.tag, sim.q1_id, sim.q1_headline, sim.q2_id, sim.q2_headline, sim.q1_timestamp, sim.q2_timestamp, sim.timediff)
             rdb.zadd("spark_mllib_tag_indexed_sim", sim.jaccard_sim, q_pair)
 
 
@@ -93,7 +93,7 @@ def find_dup_cands_within_tags(model):
             col("datasetA.timestamp").alias("q1_timestamp"),
             col("datasetB.timestamp").alias("q2_timestamp"),
             cal_timediff("datasetA.timestamp", "datasetB.timestamp").alias("timediff"),
-            find_tag("datasetA.tags", "datasetB.tags").alias("tag"),
+            find_tag("datasetA.tag_company", "datasetB.tag_company").alias("tag"),
             col("jaccard_sim")
         )
         sim_join = sim_join.filter(sim_join.timediff < config.TIME_WINDOW)
