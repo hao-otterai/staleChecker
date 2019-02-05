@@ -33,10 +33,9 @@ def compute_tf_idf(documents):
 def store_lsh_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for q in rdd:
-        tags = q.tags.split("|")
-        for tag in tags:
-            q_json = json.dumps({"id": q.id, "title": q.title, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash})
-            rdb.zadd("lsh:{0}".format(tag), q.view_count, q_json)
+        for tag in q.tag_company:
+            q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
+            rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
             rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
 
 
@@ -52,10 +51,10 @@ def compute_minhash_lsh(df, mh, lsh):
 
 
 # Store duplicate candidates in Redis
-def store_dup_cand_redis(tag, rdd):
+def store_dup_cand_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for cand in rdd:
-        cand_reformatted = (tag, cand.q1_id, cand.q1_title, cand.q2_id, cand.q2_title)
+        cand_reformatted = (cand.q1_id, cand.q1_headline, cand.q2_id, cand.q2_headline, cand.q1_timestamp, cand.q2_timestamp)
         # Store by time
         rdb.zadd("dup_cand", cand.mh_js, cand_reformatted)
 
@@ -65,7 +64,7 @@ def store_spark_mllib_tag_indexed_sim_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for sim in rdd:
         if(sim.jaccard_sim > config.DUP_QUESTION_IDENTIFY_THRESHOLD):
-            q_pair = (sim.tag, sim.q1_id, sim.q1_title, sim.q2_id, sim.q2_title)
+            q_pair = (sim.tag, sim.q1_id, sim.q1_headline, sim.q2_id, sim.q2_headline, sim.q1_timestamp, sim.q2_timestamp)
             rdb.zadd("spark_mllib_tag_indexed_sim", sim.jaccard_sim, q_pair)
 
 
@@ -76,27 +75,32 @@ def find_dup_cands_within_tags(model):
     # Fetch all tags from lsh_keys set
     for lsh_key in rdb.sscan_iter("lsh_keys", match="*", count=500):
         tag = lsh_key.replace("lsh:", "")
-        tq_table_size = rdb.zcard("lsh:{0}".format(tag))
-        if(tq_table_size >= config.DUP_QUESTION_MIN_TAG_SIZE):  # Ignore extremely small tags
-            tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
-            if config.LOG_DEBUG: print("{0}: {1} question(s)".format(tag, len(tq)))
-            tq_df = sql_context.read.json(sc.parallelize(tq))
 
-            if(config.LOG_DEBUG): print("[MLLIB BATCH]: Computing approximate similarity join...")
-            find_tag = udf(lambda x, y: util.common_tag(x, y), StringType())
-            sim_join = model.approxSimilarityJoin(tq_df, tq_df, config.DUP_QUESTION_MIN_HASH_THRESHOLD, distCol="jaccard_sim").select(
-                col("datasetA.id").alias("q1_id"),
-                col("datasetB.id").alias("q2_id"),
-                col("datasetA.title").alias("q1_title"),
-                col("datasetB.title").alias("q2_title"),
-                col("datasetA.text_body_vectorized").alias("q1_text_body"),
-                col("datasetB.text_body_vectorized").alias("q2_text_body"),
-                find_tag("datasetA.tags", "datasetB.tags").alias("tag"),
-                col("jaccard_sim")
-            )
+        tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
+        if config.LOG_DEBUG: print("{0}: {1} news".format(tag, len(tq)))
+        tq_df = sql_context.read.json(sc.parallelize(tq))
 
-            # Upload LSH similarities to Redis
-            sim_join.foreachPartition(store_spark_mllib_tag_indexed_sim_redis)
+        if(config.LOG_DEBUG): print("[MLLIB BATCH]: Computing approximate similarity join...")
+        find_tag = udf(lambda x, y: util.common_tag(x, y), StringType())
+        cal_timediff = udf(lambda x, y: abs(x-y), IntegerType())
+        sim_join = model.approxSimilarityJoin(tq_df, tq_df, config.DUP_QUESTION_MIN_HASH_THRESHOLD, distCol="jaccard_sim").select(
+            col("datasetA.id").alias("q1_id"),
+            col("datasetB.id").alias("q2_id"),
+            col("datasetA.headline").alias("q1_headline"),
+            col("datasetB.headline").alias("q2_headline"),
+            col("datasetA.text_body_vectorized").alias("q1_text_body"),
+            col("datasetB.text_body_vectorized").alias("q2_text_body"),
+            col("datasetA.timestamp").alias("q1_timestamp"),
+            col("datasetB.timestamp").alias("q2_timestamp"),
+            cal_timediff("datasetA.timestamp", "datasetB.timestamp").alias("timediff"),
+            find_tag("datasetA.tags", "datasetB.tags").alias("tag"),
+            col("jaccard_sim")
+        )
+        sim_join = sim_join.filter(sim_join.timediff < config.TIME_WINDOW)
+
+        # Upload LSH similarities to Redis
+        sim_join.foreachPartition(store_spark_mllib_tag_indexed_sim_redis)
+
 
 
 def run_minhash_lsh():

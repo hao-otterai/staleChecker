@@ -9,14 +9,22 @@ from pyspark.sql import SQLContext
 from pyspark.sql.functions import udf, col
 import redis
 
-from pyspark.sql.types import IntegerType, ArrayType
+from pyspark.conf import SparkConf
+from pyspark.context import SparkContext
+from pyspark.sql import SQLContext
+from pyspark.sql.functions import udf, col
+
+from pyspark.sql.types import IntegerType, ArrayType, StringType
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib")
 import config
 import util
+
 import min_hash
 import locality_sensitive_hash
+
+from pyspark.ml.feature import MinHashLSH, VectorAssembler, HashingTF, IDF
 
 
 # Store question data
@@ -47,6 +55,14 @@ def store_dup_cand_redis(rdd):
         cand_reformatted = (cand.q1_id, cand.q1_headline, cand.q2_id, cand.q2_headline, cand.q1_timestamp, cand.q2_timestamp)
         # Store by time
         rdb.zadd("dup_cand", cand.mh_js, cand_reformatted)
+
+# Store LSH similarity data
+def store_spark_mllib_tag_indexed_sim_redis(rdd):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    for sim in rdd:
+        if(sim.jaccard_sim > config.DUP_QUESTION_IDENTIFY_THRESHOLD):
+            q_pair = (sim.tag, sim.q1_id, sim.q1_title, sim.q2_id, sim.q2_title)
+            rdb.zadd("spark_mllib_tag_indexed_sim", sim.jaccard_sim, q_pair)
 
 
 # Compares LSH signatures, MinHash signature, and find duplicate candidates
