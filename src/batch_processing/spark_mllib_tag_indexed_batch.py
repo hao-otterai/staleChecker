@@ -18,16 +18,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) +
 import config
 import util
 
-# calculate TF-IDF
-def compute_tf_idf(documents):
-    hashingTF = HashingTF()
-    tf = hashingTF.transform(documents)
-    # While applying HashingTF only needs a single pass to the data, applying IDF needs two passes:
-    # First to compute the IDF vector and second to scale the term frequencies by IDF.
-    tf.cache()
-    idf = IDF(minDocFreq=config.MIN_DOC_FREQ).fit(tf)
-    tfidf = idf.transform(tf)
-    return tfidf
 
 # Store question data
 def store_lsh_redis(rdd):
@@ -68,10 +58,16 @@ def store_spark_mllib_tag_indexed_sim_redis(rdd):
             rdb.zadd("spark_mllib_tag_indexed_sim", sim.jaccard_sim, q_pair)
 
 
-# Compares LSH signatures, MinHash signature, and find duplicate candidates
-def find_dup_cands_within_tags(model):
+def run_minhash_lsh():
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED)
 
+    if(config.LOG_DEBUG): print("[MLLIB BATCH]: Fitting MinHashLSH model...")
+    mh = MinHashLSH(inputCol="text_body_vectorized", outputCol="min_hash", numHashTables=config.LSH_NUM_BANDS)
+    model = mh.fit(vdf)
+
+    # Compute pairwise LSH similarities for news within tags
+    if (config.LOG_DEBUG): print("[BATCH]: Fetching news in same tag, comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
     # Fetch all tags from lsh_keys set
     for lsh_key in rdb.sscan_iter("lsh_keys", match="*", count=500):
         tag = lsh_key.replace("lsh:", "")
@@ -100,19 +96,6 @@ def find_dup_cands_within_tags(model):
 
         # Upload LSH similarities to Redis
         sim_join.foreachPartition(store_spark_mllib_tag_indexed_sim_redis)
-
-
-
-def run_minhash_lsh():
-    df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED)
-
-    if(config.LOG_DEBUG): print("[MLLIB BATCH]: Fitting MinHashLSH model...")
-    mh = MinHashLSH(inputCol="text_body_vectorized", outputCol="min_hash", numHashTables=config.LSH_NUM_BANDS)
-    model = mh.fit(vdf)
-
-    # Compute pairwise LSH similarities for news within tags
-    if (config.LOG_DEBUG): print("[BATCH]: Fetching news in same tag, comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
-    find_dup_cands_within_tags(model)
 
 
 def main():
