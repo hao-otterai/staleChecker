@@ -102,33 +102,35 @@ def preprocess_file(bucket_name, file_name):
     if (config.LOG_DEBUG): print("[PROCESSING]: Stemming tokenized vector...")
     stem = udf(lambda tokens: lemmatize(tokens), ArrayType(StringType()))
     stemmed_data = stop_words_removed_data.withColumn("text_body_stemmed", stem("text_body_stop_words_removed"))
-
+    final_data = stemmed_data
     # Shingle resulting body
     # if (config.LOG_DEBUG): print("[PROCESSING] Shingling resulting text body...")
     # shingle = udf(lambda tokens: get_two_gram_shingles(tokens), ArrayType(ArrayType(StringType())))
     # shingled_data = stemmed_data.withColumn("text_body_shingled", shingle("text_body_stemmed"))
 
 
-    ### get TF-IDF vector:
-    # Vectorize so we can fit to MinHashLSH model
-    #htf = HashingTF(inputCol="text_body_stemmed", outputCol="raw_features", numFeatures=1000)
-    htf = HashingTF(inputCol="text_body_stemmed", outputCol="raw_features")
-    htf_df = htf.transform(stemmed_data)
+    ### get TF-IDF vector
+    if (config.USE_TF_IN_PREPROCESSING):
+        # Vectorize so we can fit to MinHashLSH model
+        #htf = HashingTF(inputCol="text_body_stemmed", outputCol="raw_features", numFeatures=1000)
+        htf = HashingTF(inputCol="text_body_stemmed", outputCol="raw_features")
+        htf_df = htf.transform(final_data)
 
-    if (config.USE_TFIDF): # under maintenance
-        idf = IDF(inputCol="rawFeatures", outputCol="features", minDocFreq = config.MIN_DOC_FREQ)
-        idfModel = idf.fit(htf_df)
-        tfidf = idfModel.transform(featurizedData)
-        vectorizer = VectorAssembler(inputCols=["features"], outputCol="text_body_vectorized")
-        vdf = vectorizer.transform(htf_df)
-    else:
-        vectorizer = VectorAssembler(inputCols=["raw_features"], outputCol="text_body_vectorized")
-        vdf = vectorizer.transform(htf_df)
+        if (config.USE_TFIDF): # under maintenance
+            idf = IDF(inputCol="rawFeatures", outputCol="features", minDocFreq = config.MIN_DOC_FREQ)
+            idfModel = idf.fit(htf_df)
+            tfidf = idfModel.transform(featurizedData)
+            vectorizer = VectorAssembler(inputCols=["features"], outputCol="text_body_vectorized")
+            vdf = vectorizer.transform(htf_df)
+        else:
+            vectorizer = VectorAssembler(inputCols=["raw_features"], outputCol="text_body_vectorized")
+            vdf = vectorizer.transform(htf_df)
+        final_data = vdf
 
     # timestamp
     if (config.LOG_DEBUG): print("[PROCESSING]: Formatting unix_timestamp ...")
     # final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'").cast('timestamp'))
-    final_data = vdf.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
+    final_data = final_data.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
 
 
     # Extract data that we want

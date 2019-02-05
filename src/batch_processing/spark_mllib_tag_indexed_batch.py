@@ -8,7 +8,7 @@ from pyspark.context import SparkContext
 from pyspark.sql import SQLContext
 from pyspark.sql.functions import udf, col
 from pyspark.ml.feature import MinHashLSH, VectorAssembler, HashingTF, IDF
-
+from spark.ml.linalg import DenseVector
 import redis
 
 from pyspark.sql.types import IntegerType, ArrayType, StringType
@@ -58,9 +58,28 @@ def store_spark_mllib_tag_indexed_sim_redis(rdd):
             rdb.zadd("spark_mllib_tag_indexed_sim", sim.jaccard_sim, q_pair)
 
 
+from pyspark.sql.column import _to_java_column, _to_seq, Column
+def as_vector(col):
+    sc = SparkContext.getOrCreate()
+    f = sc._jvm.com.example.spark.udfs.udfs.as_vector()
+    return Column(f.apply(_to_seq(sc, [col], _to_java_column)))
+
 def run_minhash_lsh():
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED)
+
+    htf = HashingTF(inputCol="text_body_stemmed", outputCol="raw_features")
+    htf_df = htf.transform(df)
+
+    if (config.USE_TFIDF): # under maintenance
+        idf = IDF(inputCol="rawFeatures", outputCol="features", minDocFreq = config.MIN_DOC_FREQ)
+        idfModel = idf.fit(htf_df)
+        tfidf = idfModel.transform(featurizedData)
+        vectorizer = VectorAssembler(inputCols=["features"], outputCol="text_body_vectorized")
+        vdf = vectorizer.transform(htf_df)
+    else:
+        vectorizer = VectorAssembler(inputCols=["raw_features"], outputCol="text_body_vectorized")
+        vdf = vectorizer.transform(htf_df)
 
     if(config.LOG_DEBUG): print("[MLLIB BATCH]: Fitting MinHashLSH model...")
     mh = MinHashLSH(inputCol="text_body_vectorized", outputCol="min_hash", numHashTables=config.LSH_NUM_BANDS)

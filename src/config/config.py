@@ -53,6 +53,7 @@ QUESTION_POPULARITY_THRESHOLD = 0
 
 
 # TF-idf
+USE_TF_IN_PREPROCESSING = False
 USE_TFIDF = False # use TF-IDF when set to True, else use TF (no IDF)
 MIN_DOC_FREQ = 2
 
