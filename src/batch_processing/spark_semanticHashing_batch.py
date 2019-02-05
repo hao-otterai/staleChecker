@@ -19,17 +19,14 @@ import min_hash
 import locality_sensitive_hash
 
 
-# id, headline, body, text_body, text_body_stemmed, hot, display_date, display_timestamp, djn_urgency
-
 # Store question data
-# NB remove tags
 def store_lsh_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for q in rdd:
-        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
-        rdb.zadd("pre_cal_mh_lsh", q.display_timestamp, q_json)
-        #rdb.sadd("pre_cal_mh_lsh", q_json)
-        #rdb.append("lsh", q_json)
+        for tag in q.tag_company:
+            q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
+            rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
+            rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
 
 
 # Computes MinHashes, LSHes for all in DataFrame
@@ -53,44 +50,48 @@ def store_dup_cand_redis(rdd):
 
 
 # Compares LSH signatures, MinHash signature, and find duplicate candidates
-def find_dup_cands(mh, lsh):
+def find_dup_cands_within_tags(mh, lsh):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
-    # Fetch all news. ideally, sort the news by timestamp, and get within a range of timestamps
-    tq = rdb.zrangebyscore("pre_cal_mh_lsh", "-inf", "+inf", withscores=False)
-    #tq = rdb.smembers("pre_cal_mh_lsh")
+    # Fetch all tags from lsh_keys set
+    for lsh_key in rdb.sscan_iter("lsh_keys", match="*", count=500):
+        tag = lsh_key.replace("lsh:", "")
+        tq_table_size = rdb.zcard("lsh:{0}".format(tag))
 
-    if config.LOG_DEBUG: print("{0} news".format(len(tq)))
-    tq_df = sql_context.read.json(sc.parallelize(tq))
+        # Fetch all news. ideally, sort the news by timestamp, and get within a range of timestamps
+        tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
 
-    # NB this should be a crossJoin http://spark.apache.org/docs/2.1.0/api/python/pyspark.sql.html
-    find_lsh_sim = udf(lambda x, y: lsh.common_bands_count(x, y), IntegerType())
-    lsh_sim_df = tq_df.alias("q1").join(tq_df.alias("q2"),
-        [col("q1.timestamp") < col("q2.timestamp"),
-        col("q2.timestamp") - col("q1.timestamp") < config.TIME_WINDOW]).select(
-        col("q1.id").alias("q1_id"),
-        col("q2.id").alias("q2_id"),
-        col("q1.min_hash").alias("q1_min_hash"),
-        col("q2.min_hash").alias("q2_min_hash"),
-        col("q1.headline").alias("q1_headline"),
-        col("q2.headline").alias("q2_headline"),
-        col("q1.timestamp").alias("q1_timestamp"),
-        col("q2.timestamp").alias("q2_timestamp"),
-        find_lsh_sim("q1.lsh_hash", "q2.lsh_hash").alias("lsh_sim")
-    ).sort("q1_timestamp", "q2_timestamp")
+        if config.LOG_DEBUG: print("{0} news".format(len(tq)))
+        tq_df = sql_context.read.json(sc.parallelize(tq))
 
-    # Duplicate candidates have a high enough LSH similarity count
-    lsh_cand_df = lsh_sim_df.filter(lsh_sim_df.lsh_sim >= config.LSH_SIMILARITY_BAND_COUNT)
+        # NB this should be a crossJoin http://spark.apache.org/docs/2.1.0/api/python/pyspark.sql.html
+        find_lsh_sim = udf(lambda x, y: lsh.common_bands_count(x, y), IntegerType())
+        lsh_sim_df = tq_df.alias("q1").join(tq_df.alias("q2"),
+            [col("q1.timestamp") < col("q2.timestamp"),
+            col("q2.timestamp") - col("q1.timestamp") < config.TIME_WINDOW]).select(
+            col("q1.id").alias("q1_id"),
+            col("q2.id").alias("q2_id"),
+            col("q1.min_hash").alias("q1_min_hash"),
+            col("q2.min_hash").alias("q2_min_hash"),
+            col("q1.headline").alias("q1_headline"),
+            col("q2.headline").alias("q2_headline"),
+            col("q1.timestamp").alias("q1_timestamp"),
+            col("q2.timestamp").alias("q2_timestamp"),
+            find_lsh_sim("q1.lsh_hash", "q2.lsh_hash").alias("lsh_sim")
+        ).sort("q1_timestamp", "q2_timestamp")
 
-    # Compare MinHash jaccard similarity scores for duplicate candidates
-    find_mh_js = udf(lambda x, y: mh.jaccard_sim_score(x, y))
-    mh_cand_df = lsh_cand_df.withColumn("mh_js", find_mh_js(lsh_cand_df.q1_min_hash, lsh_cand_df.q2_min_hash))
+        # Duplicate candidates have a high enough LSH similarity count
+        lsh_cand_df = lsh_sim_df.filter(lsh_sim_df.lsh_sim >= config.LSH_SIMILARITY_BAND_COUNT)
 
-    # Duplicate candidates need to have a high enough MinHash Jaccard similarity score
-    dup_cand_df = mh_cand_df.filter(mh_cand_df.mh_js >= config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+        # Compare MinHash jaccard similarity scores for duplicate candidates
+        find_mh_js = udf(lambda x, y: mh.jaccard_sim_score(x, y))
+        mh_cand_df = lsh_cand_df.withColumn("mh_js", find_mh_js(lsh_cand_df.q1_min_hash, lsh_cand_df.q2_min_hash))
 
-    print("number of partitions: ", dup_cand_df.rdd.getNumPartitions())
-    dup_cand_df.foreachPartition(lambda rdd: store_dup_cand_redis(rdd))
+        # Duplicate candidates need to have a high enough MinHash Jaccard similarity score
+        dup_cand_df = mh_cand_df.filter(mh_cand_df.mh_js >= config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+
+        print("number of partitions: ", dup_cand_df.rdd.getNumPartitions())
+        dup_cand_df.foreachPartition(lambda rdd: store_dup_cand_redis(rdd))
 
 
 # understanding LSH parameters:
@@ -115,7 +116,7 @@ def run_minhash_lsh():
 
     # Compute pairwise LSH similarities for questions within tags
     if (config.LOG_DEBUG): print("[BATCH]: Fetching questions, comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
-    find_dup_cands(mh, lsh)
+    find_dup_cands_within_tags(mh, lsh)
 
 
 def main():
