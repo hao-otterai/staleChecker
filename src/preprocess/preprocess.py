@@ -60,11 +60,8 @@ def generate_tag(input_string):
 # Preprocess a data file and upload it
 def preprocess_file(bucket_name, file_name):
 
-    final_output_fields = """
-        id, headline, body, text_body, text_body_stemmed,
-        tag_company, tag_industry, tag_market, source,
-        hot, display_date, display_timestamp, djn_urgency
-        """
+    final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, \
+    tag_industry, tag_market, source, hot, display_date, display_timestamp, djn_urgency"
 
     raw_data = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
     # raw_data = sc.textFile("s3a://{0}/{1}".format(bucket_name, file_name))
