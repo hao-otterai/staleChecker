@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) +
 import config
 import util
 
+from pyspark.sql.column import _to_java_column, _to_seq, Column
 
 # Store question data
 def store_lsh_redis(rdd):
@@ -58,11 +59,11 @@ def store_spark_mllib_tag_indexed_sim_redis(rdd):
             rdb.zadd("spark_mllib_tag_indexed_sim", sim.jaccard_sim, q_pair)
 
 
-from pyspark.sql.column import _to_java_column, _to_seq, Column
 def as_vector(col):
     sc = SparkContext.getOrCreate()
     f = sc._jvm.com.example.spark.udfs.udfs.as_vector()
     return Column(f.apply(_to_seq(sc, [col], _to_java_column)))
+
 
 def run_minhash_lsh():
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)

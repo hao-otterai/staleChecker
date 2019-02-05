@@ -60,6 +60,12 @@ def generate_tag(input_string):
 # Preprocess a data file and upload it
 def preprocess_file(bucket_name, file_name):
 
+    final_output_fields = """
+        id, headline, body, text_body, text_body_stemmed,
+        tag_company, tag_industry, tag_market, source,
+        hot, display_date, display_timestamp, djn_urgency
+        """
+
     raw_data = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
     # raw_data = sc.textFile("s3a://{0}/{1}".format(bucket_name, file_name))
     # header = raw_data.first()
@@ -126,6 +132,7 @@ def preprocess_file(bucket_name, file_name):
             vectorizer = VectorAssembler(inputCols=["raw_features"], outputCol="text_body_vectorized")
             vdf = vectorizer.transform(htf_df)
         final_data = vdf
+        final_output_fields += ", text_body_tokenized "
 
     # timestamp
     if (config.LOG_DEBUG): print("[PROCESSING]: Formatting unix_timestamp ...")
@@ -135,15 +142,12 @@ def preprocess_file(bucket_name, file_name):
 
     # Extract data that we want
     final_data.registerTempTable("final_data")
-    final_data_sql = "SELECT id, headline, body, text_body, text_body_stemmed,  text_body_vectorized, \
-        tag_company, tag_industry, tag_market, source,\
-        hot, display_date, display_timestamp, djn_urgency from final_data"
-    preprocessed_data = sql_context.sql( final_data_sql )
+    preprocessed_data = sql_context.sql( "SELECT {} from final_data".format(final_output_fields) )
 
     if (config.LOG_DEBUG):
         print('Schema of transformed input data')
         final_data.printSchema()
-        print('Select fields in final_data:', final_data_sql)
+        print('Fields to output for final_data:', final_output_fields)
         print("[UPLOAD]: Writing preprocessed data to AWS...")
 
     # Write to AWS
