@@ -112,10 +112,10 @@ def preprocess_file(bucket_name, file_name):
     ### get TF-IDF vector:
     # Vectorize so we can fit to MinHashLSH model
     #htf = HashingTF(inputCol="text_body_stemmed", outputCol="raw_features", numFeatures=1000)
-    htf = HashingTF(inputCol="text_body_stemmed", outputCol="raw_features", numFeatures=1000)
+    htf = HashingTF(inputCol="text_body_stemmed", outputCol="raw_features")
     htf_df = htf.transform(stemmed_data)
 
-    if (conf.USE_TFIDF):
+    if (config.USE_TFIDF): # under maintenance
         idf = IDF(inputCol="rawFeatures", outputCol="features", minDocFreq = config.MIN_DOC_FREQ)
         idfModel = idf.fit(htf_df)
         tfidf = idfModel.transform(featurizedData)
