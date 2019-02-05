@@ -34,7 +34,7 @@ def store_lsh_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for q in rdd:
         for tag in q.tag_company:
-            q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
+            q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash, "display_timestamp": q.display_timestamp })
             rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
             rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
 
@@ -90,9 +90,9 @@ def find_dup_cands_within_tags(model):
             col("datasetB.headline").alias("q2_headline"),
             col("datasetA.text_body_vectorized").alias("q1_text_body"),
             col("datasetB.text_body_vectorized").alias("q2_text_body"),
-            col("datasetA.timestamp").alias("q1_timestamp"),
-            col("datasetB.timestamp").alias("q2_timestamp"),
-            cal_timediff("datasetA.timestamp", "datasetB.timestamp").alias("timediff"),
+            col("datasetA.display_timestamp").alias("q1_timestamp"),
+            col("datasetB.display_timestamp").alias("q2_timestamp"),
+            cal_timediff("datasetA.display_timestamp", "datasetB.display_timestamp").alias("timediff"),
             find_tag("datasetA.tag_company", "datasetB.tag_company").alias("tag"),
             col("jaccard_sim")
         )
@@ -106,22 +106,12 @@ def find_dup_cands_within_tags(model):
 def run_minhash_lsh():
     df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED)
 
-    mh = MinHashLSH(inputCol="text_body_vectorized", outputCol="min_hash", numHashTables=config.LSH_NUM_BANDS)
-
-    # Vectorize so we can fit to MinHashLSH model
-
-    htf = HashingTF(inputCol="text_body_stemmed", outputCol="raw_features", numFeatures=1000)
-    htf_df = htf.transform(df)
-
-    vectorizer = VectorAssembler(inputCols=["raw_features"], outputCol="text_body_vectorized")
-    vdf = vectorizer.transform(htf_df)
-
     if(config.LOG_DEBUG): print("[MLLIB BATCH]: Fitting MinHashLSH model...")
+    mh = MinHashLSH(inputCol="text_body_vectorized", outputCol="min_hash", numHashTables=config.LSH_NUM_BANDS)
     model = mh.fit(vdf)
 
-    # Compute pairwise LSH similarities for questions within tags
-    if (config.LOG_DEBUG): print("[BATCH]: Fetching questions in same tag, \
-        comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
+    # Compute pairwise LSH similarities for news within tags
+    if (config.LOG_DEBUG): print("[BATCH]: Fetching news in same tag, comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
     find_dup_cands_within_tags(model)
 
 

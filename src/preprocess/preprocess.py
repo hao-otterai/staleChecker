@@ -2,10 +2,9 @@ import sys
 import os
 import re
 import time
-#from termcolor import colored
 
-from pyspark.ml.feature import StopWordsRemover
-from pyspark.ml.feature import Tokenizer
+from pyspark.ml.feature import StopWordsRemover, Tokenizer
+from pyspark.ml.feature import HashingTF, IDF, VectorAssembler
 
 from pyspark.sql.types import ArrayType, StringType
 from pyspark.sql.functions import udf, concat, col, lit
@@ -56,20 +55,21 @@ def get_tri_gram_shingles(tokens):
     return [(tokens[i], tokens[i + 1], tokens[i + 2]) for i in range(len(tokens) - 2)]
 
 def generate_tag(input_string):
-    return input_string.split("||") if len(input_string)>0 else ['<unspecified>']
+    return input_string.replace('/','_').split("||") if len(input_string)>0 else ['<UNS>']
 
 # Preprocess a data file and upload it
 def preprocess_file(bucket_name, file_name):
-    raw_data = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
-    #raw_data = spark.read.format("csv").option("header", "true").load("csvfile.csv")
 
+    raw_data = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
     # raw_data = sc.textFile("s3a://{0}/{1}".format(bucket_name, file_name))
     # header = raw_data.first()
     # raw_data = raw_data.filter(lambda line: line != header)
     # #raw_data.take(10)
     # raw_data = raw_data.map(lambda k: k.split(",")).toDF(header.split(","))
     #raw_data.show()
-    if (config.LOG_DEBUG): raw_data.printSchema()
+    if (config.LOG_DEBUG):
+        print('Schema of raw input data')
+        raw_data.printSchema()
 
     # Clean question body
     if(config.LOG_DEBUG): print("[PROCESSING]: Cleaning headline and body...")
@@ -108,28 +108,45 @@ def preprocess_file(bucket_name, file_name):
     # shingle = udf(lambda tokens: get_two_gram_shingles(tokens), ArrayType(ArrayType(StringType())))
     # shingled_data = stemmed_data.withColumn("text_body_shingled", shingle("text_body_stemmed"))
 
+
+    ### get TF-IDF vector:
+    # Vectorize so we can fit to MinHashLSH model
+    #htf = HashingTF(inputCol="text_body_stemmed", outputCol="raw_features", numFeatures=1000)
+    htf = HashingTF(inputCol="text_body_stemmed", outputCol="raw_features", numFeatures=1000)
+    htf_df = htf.transform(stemmed_data)
+
+    if (conf.USE_TFIDF):
+        idf = IDF(inputCol="rawFeatures", outputCol="features", minDocFreq = config.MIN_DOC_FREQ)
+        idfModel = idf.fit(htf_df)
+        tfidf = idfModel.transform(featurizedData)
+        vectorizer = VectorAssembler(inputCols=["features"], outputCol="text_body_vectorized")
+        vdf = vectorizer.transform(htf_df)
+    else:
+        vectorizer = VectorAssembler(inputCols=["raw_features"], outputCol="text_body_vectorized")
+        vdf = vectorizer.transform(htf_df)
+
     # timestamp
     if (config.LOG_DEBUG): print("[PROCESSING]: Formatting unix_timestamp ...")
-    # final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp(
-    #                 "display_date", "yyyyMMdd'T'HHmmss.SSS'Z'").cast('timestamp'))
-    final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
+    # final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'").cast('timestamp'))
+    final_data = vdf.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
 
-    if (config.LOG_DEBUG): final_data.printSchema()
+
     # Extract data that we want
-    #final_data = shingled_data
     final_data.registerTempTable("final_data")
-
-    preprocessed_data = sql_context.sql( "SELECT id, headline, body, text_body, \
+    final_data_sql = "SELECT id, headline, body, text_body, text_body_stemmed,  text_body_vectorized, \
         tag_company, tag_industry, tag_market, source,\
-        text_body_stemmed,  hot, display_date, display_timestamp, djn_urgency from final_data")
+        hot, display_date, display_timestamp, djn_urgency from final_data"
+    preprocessed_data = sql_context.sql( final_data_sql )
+
+    if (config.LOG_DEBUG):
+        print('Schema of transformed input data')
+        final_data.printSchema()
+        print('Select fields in final_data:', final_data_sql)
+        print("[UPLOAD]: Writing preprocessed data to AWS...")
 
     # Write to AWS
-    if (config.LOG_DEBUG): print("[UPLOAD]: Writing preprocessed data to AWS...")
     write_aws_s3(config.S3_BUCKET_BATCH_PREPROCESSED, file_name, preprocessed_data)
 
-    # if (config.LOG_DEBUG):
-    #     print("[debug] show 5 random samples of final data")
-    #     final_data.sample(False, 0.1, seed=0).limit(5).foreach(lambda x: print(x))
 
 def preprocess_all():
     bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
