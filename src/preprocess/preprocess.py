@@ -79,10 +79,10 @@ def preprocess_file(bucket_name, file_name):
 
     # generate tags based on company, industry, and market
     if (config.LOG_DEBUG): print("[PROCESSING]: Generating news tags based on industry, market and company...")
-    tag_generator = udf(lambda input_string: generate_tag(input_string), StringType())
-    partially_cleaned_data = partially_cleaned_data.withColumn( "tag_company", tag_generator("company"))
+    tag_generator = udf(lambda input_string: generate_tag(input_string), ArrayType(StringType()))
+    partially_cleaned_data = partially_cleaned_data.withColumn( "tag_company",  tag_generator("company"))
     partially_cleaned_data = partially_cleaned_data.withColumn( "tag_industry", tag_generator("industry"))
-    partially_cleaned_data = partially_cleaned_data.withColumn( "tag_market", tag_generator("market"))
+    partially_cleaned_data = partially_cleaned_data.withColumn( "tag_market",   tag_generator("market"))
 
 
     # Concat cleaned question body and question title to form question vector
