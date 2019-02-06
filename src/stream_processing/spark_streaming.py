@@ -9,7 +9,6 @@ from pyspark import SparkContext
 from pyspark.conf import SparkConf
 from pyspark.streaming import StreamingContext
 from pyspark.streaming.kafka import KafkaUtils
-from termcolor import colored
 
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages org.apache.spark:spark-streaming-kafka-0-8_2.11:2.2.0 pyspark-shell"
@@ -21,6 +20,7 @@ from min_hash import MinHash
 from locality_sensitive_hash import LSH
 
 # Converts incoming question, Adds timestamp to incoming question
+### NB - a lot of preprocessing needs to be added here
 def extract_data(data):
     data["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
     return data
@@ -53,9 +53,10 @@ def process_question(question, mh, lsh):
     tag = max_tag
 
     # Abandon spark parallelization
-    print(colored("Tag:{0}, Size: {1}".format(max_tag, max_tag_table_size), "green"))
+    # can we improve on this? 
+    print("Tag:{0}, Size: {1}".format(max_tag, max_tag_table_size))
     if(max_tag_table_size >= config.DUP_QUESTION_MIN_TAG_SIZE):
-        print(colored("Comparing in Tag:{0}".format(tag)), "green")
+        print("Comparing in Tag:{0}".format(tag))
         # Too slow
         tq_table = rdb.zrevrange("lsh:{0}".format(tag), 0, config.MAX_QUESTION_COMPARISON, withscores=False)
         tq = [json.loads(tq_entry) for tq_entry in tq_table]
@@ -65,10 +66,10 @@ def process_question(question, mh, lsh):
                 lsh_comparison = lsh.common_bands_count(entry["lsh_hash"], q_lsh)
                 if(lsh_comparison > config.LSH_SIMILARITY_BAND_COUNT):
                     mh_comparison = mh.jaccard_sim_score(entry["min_hash"], q_mh)
-                    print(colored("MH comparison:{0}".format(mh_comparison), "blue"))
+                    print("MH comparison:{0}".format(mh_comparison))
                     if(mh_comparison > config.DUP_QUESTION_MIN_HASH_THRESHOLD):
                         cand_reformatted = (tag, q_id, question["title"], entry["id"], entry["title"], question["timestamp"])
-                        print(colored("Found candidate: {0}".format(cand_reformatted), "cyan"))
+                        print("Found candidate: {0}".format(cand_reformatted))
                         rdb.zadd("dup_cand", mh_comparison, cand_reformatted)
 
 
