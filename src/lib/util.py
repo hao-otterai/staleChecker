@@ -65,68 +65,68 @@ def write_json_aws_s3(bucket_name, file_name, df):
     df.write.save("s3a://{0}/{1}".format(bucket_name, file_name), format="json", mode="overwrite")
 
 
-
-def getInputData(filename):
-# Get data from input file.
-    _data = []
-
-    try:
-        with open(filename, 'r') as _fp:
-            for _each_line in _fp:
-                _row = _each_line.strip().split(SPLITTER)
-                _data.append((_row[0],_row[1:]))
-            if DEBUG: print(_data)
-        _fp.close()
-        return _data
-    except IOError as _err:
-        if DEBUG:
-            print ('File error: ' + str (_err))
-        else :
-            pass
-        exit()
-
-def setOutputData(filename='', jaccard_similarity_dict={}):
-    # output results.
-    try:
-        if filename != None :
-            orig_stdout = sys.stdout
-            f = file(filename, 'w')
-            sys.stdout = f
-        else:
-            pass
-    ##########
-
-        if DEBUG: print('**jaccard_similarity_dict = %s'%(jaccard_similarity_dict))
-        _sorted_list = sorted(jaccard_similarity_dict.items(), key=lambda x: int(x[0][1:])) # x[0] return key, then get characters from second and convert to integer.
-        if DEBUG: print('**_sorted_list = %s'%(_sorted_list))
-        for _x in _sorted_list: # get base set
-            _count = 0
-            _b_set = _x[0]
-
-            if DEBUG: print('_x=%s'%(str(_x)))
-            _result = sorted(_x[1], key=lambda x: (x[0],-int(x[1][1:])), reverse=True)[:NUM_OF_MOST_SIMILAR_SET] #Get top NUM_OF_MOST_SIMILAR_SET similar sets
-            if DEBUG: print('sort by jaccard similarity _result=%s'%(_result))
-            _result = sorted(_result, key=lambda x: int(x[1][1:])) # sorted by set id
-            if DEBUG: print('sort by similarity set name _result=%s'%(_result))
-
-            print('%s:'%(str(_b_set)), end ='')
-            for _r in _result: # get data from similar sets.
-                if _count == 0:
-                    _count += 1
-                    print('%s'%(str(_r[1])), end ='') # print sorted similar set
-                else:
-                    print(',%s'%(str(_r[1])), end ='') # print sorted similar set
-            print(end='\n')
-    ###########
-        sys.stdout.flush()
-        if filename != None :
-            sys.stdout = orig_stdout
-            f.close()
-        else:
-            pass
-    except IOError as _err:
-        if (DEBUG == True):
-            print ('File error: ' + str (_err))
-        else :
-            pass
-        exit()
+#
+# def getInputData(filename):
+# # Get data from input file.
+#     _data = []
+#
+#     try:
+#         with open(filename, 'r') as _fp:
+#             for _each_line in _fp:
+#                 _row = _each_line.strip().split(SPLITTER)
+#                 _data.append((_row[0],_row[1:]))
+#             if DEBUG: print(_data)
+#         _fp.close()
+#         return _data
+#     except IOError as _err:
+#         if DEBUG:
+#             print ('File error: ' + str (_err))
+#         else :
+#             pass
+#         exit()
+#
+# def setOutputData(filename='', jaccard_similarity_dict={}):
+#     # output results.
+#     try:
+#         if filename != None :
+#             orig_stdout = sys.stdout
+#             f = file(filename, 'w')
+#             sys.stdout = f
+#         else:
+#             pass
+#     ##########
+#
+#         if DEBUG: print('**jaccard_similarity_dict = %s'%(jaccard_similarity_dict))
+#         _sorted_list = sorted(jaccard_similarity_dict.items(), key=lambda x: int(x[0][1:])) # x[0] return key, then get characters from second and convert to integer.
+#         if DEBUG: print('**_sorted_list = %s'%(_sorted_list))
+#         for _x in _sorted_list: # get base set
+#             _count = 0
+#             _b_set = _x[0]
+#
+#             if DEBUG: print('_x=%s'%(str(_x)))
+#             _result = sorted(_x[1], key=lambda x: (x[0],-int(x[1][1:])), reverse=True)[:NUM_OF_MOST_SIMILAR_SET] #Get top NUM_OF_MOST_SIMILAR_SET similar sets
+#             if DEBUG: print('sort by jaccard similarity _result=%s'%(_result))
+#             _result = sorted(_result, key=lambda x: int(x[1][1:])) # sorted by set id
+#             if DEBUG: print('sort by similarity set name _result=%s'%(_result))
+#
+#             print('%s:'%(str(_b_set)), end ='')
+#             for _r in _result: # get data from similar sets.
+#                 if _count == 0:
+#                     _count += 1
+#                     print('%s'%(str(_r[1])), end ='') # print sorted similar set
+#                 else:
+#                     print(',%s'%(str(_r[1])), end ='') # print sorted similar set
+#             print(end='\n')
+#     ###########
+#         sys.stdout.flush()
+#         if filename != None :
+#             sys.stdout = orig_stdout
+#             f.close()
+#         else:
+#             pass
+#     except IOError as _err:
+#         if (DEBUG == True):
+#             print ('File error: ' + str (_err))
+#         else :
+#             pass
+#         exit()
