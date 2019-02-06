@@ -1,7 +1,6 @@
 import numpy as np
 import mmh3
 
-
 class MinHash(object):
     def __init__(self, k, random_seed=50):
         self._k = k
@@ -29,3 +28,40 @@ class MinHash(object):
 
     def sim_count(self, x, y):
         return len(set(list(x)).intersection(set(list(y))))
+
+# class MinHash(object):
+#     '''
+#     This class implements MinHash algorithm.
+#         Calculate signature (hash value) for each item in data set.
+#         Return the minimum number of hash value
+#     '''
+#     hash_func = None
+#
+#     def customized_hash(data, seed):
+#         '''
+#         This function implements a customized hash function for MinHash.
+#             Data = a data/item you want to get hash value.
+#             Seed = a seed number to generate different hash function.
+#         '''
+#         return (3*int(data) + 13*int(seed)) % 100
+#
+#     def __init__(self, hash_function=None):
+#         '''
+#         Constructor
+#         '''
+#         if hash_function is None: hash_function = customized_hash
+#
+#         MinHash.hash_func = staticmethod(hash_function)
+#
+#     @staticmethod
+#     def get_value(data_list=[], seed=0):
+#         _signatures = []
+#         _signature = None
+#
+#         if DEBUG > 1: print('Minhash.get_signature=>data_list=%s, seed=%d'%(data_list, seed))
+#         for data in data_list:
+#             _signature = MinHash.hash_func(data, seed)
+#             #_signature = (3*int(data) + 13*int(seed)) % 100
+#             _signatures.append(_signature)
+#         if DEBUG > 1: print('Minhash.get_signature=>_signatures=%s'%(_signatures))
+#         return min(_signatures)

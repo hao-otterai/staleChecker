@@ -53,7 +53,7 @@ def process_question(question, mh, lsh):
     tag = max_tag
 
     # Abandon spark parallelization
-    # can we improve on this? 
+    # can we improve on this?
     print("Tag:{0}, Size: {1}".format(max_tag, max_tag_table_size))
     if(max_tag_table_size >= config.DUP_QUESTION_MIN_TAG_SIZE):
         print("Comparing in Tag:{0}".format(tag))

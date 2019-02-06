@@ -42,7 +42,9 @@ def compute_minhash_lsh(df, mh, lsh):
 def store_lsh_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for q in rdd:
+        if config.LOG_DEBUG: print("tag_company: {}".format(q.tag_company))
         for tag in q.tag_company:
+            if config.LOG_DEBUG: print("tag: {}".format(tag))
             q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
             rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
             rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
@@ -70,6 +72,7 @@ def store_spark_mllib_tag_indexed_sim_redis(rdd):
 def find_dup_cands_within_tags(mh, lsh):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
+    if config.LOG_DEBUG: print("find duplicate within tags...")
     # Fetch all tags from lsh_keys set
     for lsh_key in rdb.sscan_iter("lsh_keys", match="*", count=500):
         tag = lsh_key.replace("lsh:", "")
@@ -77,40 +80,76 @@ def find_dup_cands_within_tags(mh, lsh):
 
         # Fetch all news. ideally, sort the news by timestamp, and get within a range of timestamps
         tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
-
-        if config.LOG_DEBUG: print("{0} news".format(len(tq)))
+        if config.LOG_DEBUG: print("tag ", tag, ":{0} news".format(len(tq)))
         tq_df = sql_context.read.json(sc.parallelize(tq))
 
+        find_similar_cand_with_lsh(tq_df)
+        break
 
 
-        ### this is a major performance limiting step which should be optimized
-        find_lsh_sim = udf(lambda x, y: lsh.common_bands_count(x, y), IntegerType())
-        lsh_sim_df = tq_df.alias("q1").join(tq_df.alias("q2"),
-            [col("q1.timestamp") < col("q2.timestamp"),
-            col("q2.timestamp") - col("q1.timestamp") < config.TIME_WINDOW]).select(
-            col("q1.id").alias("q1_id"),
-            col("q2.id").alias("q2_id"),
-            col("q1.min_hash").alias("q1_min_hash"),
-            col("q2.min_hash").alias("q2_min_hash"),
-            col("q1.headline").alias("q1_headline"),
-            col("q2.headline").alias("q2_headline"),
-            col("q1.timestamp").alias("q1_timestamp"),
-            col("q2.timestamp").alias("q2_timestamp"),
-            find_lsh_sim("q1.lsh_hash", "q2.lsh_hash").alias("lsh_sim")
-        ).sort("q1_timestamp", "q2_timestamp")
+def find_similar_cand_with_lsh(df):
+    if config.LOG_DEBUG: print('implementing LSH for finding similar candidates')
+    ### spark officla LSH implementation: https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/feature/LSH.scala
 
-        # Duplicate candidates have a high enough LSH similarity count
-        lsh_cand_df = lsh_sim_df.filter(lsh_sim_df.lsh_sim >= config.LSH_SIMILARITY_BAND_COUNT)
+    # explode the dataframe with news_id, lash_hash :
+    # explode: https://hadoopist.wordpress.com/2016/05/16/how-to-handle-nested-dataarray-of-structures-or-multiple-explodes-in-sparkscala-and-pyspark/
 
-        # Compare MinHash jaccard similarity scores for duplicate candidates
-        find_mh_js = udf(lambda x, y: mh.jaccard_sim_score(x, y))
-        mh_cand_df = lsh_cand_df.withColumn("mh_js", find_mh_js(lsh_cand_df.q1_min_hash, lsh_cand_df.q2_min_hash))
+    # broadcase the data
+    # find for each hash bucket the set of news_ids
 
-        # Duplicate candidates need to have a high enough MinHash Jaccard similarity score
-        dup_cand_df = mh_cand_df.filter(mh_cand_df.mh_js >= config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+    # find bucket hashes which have multiple news_ids
+    test = df.select(col('id'), col('lsh_hash')).flatMap(lambda x: [((hash, i), x[0]) for i, hash in enumerate(x[1])])
+    print(test.first())
 
-        print("number of partitions: ", dup_cand_df.rdd.getNumPartitions())
-        dup_cand_df.foreachPartition(lambda rdd: store_dup_cand_redis(rdd))
+    test2 = test.reduceByKey(lambda a, b: a+','+b).map(lambda x: tuple(x[1].split(','))).filter(len(x[1]) > 1).distinct()
+    print(test2)
+
+    # calculate the number of common buckets each candidate pair has
+    # candidate list should be those which have at least certain amount of common buckets
+    # calculate the jaccard_similarity for all candidate pairs
+    # filter candidate pairs whose jaccard_similarity is above certain threshold
+
+    """
+    _rdd_similar_set_candidate_list = _rdd_dataset.map(lambda x: LSH.get_set_signatures(x, _row_list)).flatMap(lambda x:
+        ((x[i][0], x[i][1]) for i in range(len(x)))).groupByKey().map(lambda x: tuple(x[1])).filter(lambda x: len(x)>1).distinct()
+    if DEBUG: print ('LSH.execute=>_rdd_similar_set_candidate_list =%s'%(_rdd_similar_set_candidate_list.collect()))
+
+    rdd_dataset = _rdd_similar_set_candidate_list.map(lambda candidate_sets: LSH.get_jaccard_similarity(_dataset, candidate_sets))
+    _similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: LSH.merge_result(acc, val)).collectAsMap()
+    if DEBUG: print('LSH.execute=>_similar_sets_dict2=%s'%(_similar_sets_dict))
+    return _similar_sets_dict
+    """
+
+    """
+    ### this is a major performance limiting step which should be optimized
+    find_lsh_sim = udf(lambda x, y: lsh.common_bands_count(x, y), IntegerType())
+    lsh_sim_df = tq_df.alias("q1").join(tq_df.alias("q2"),
+        [col("q1.timestamp") < col("q2.timestamp"),
+        col("q2.timestamp") - col("q1.timestamp") < config.TIME_WINDOW]).select(
+        col("q1.id").alias("q1_id"),
+        col("q2.id").alias("q2_id"),
+        col("q1.min_hash").alias("q1_min_hash"),
+        col("q2.min_hash").alias("q2_min_hash"),
+        col("q1.headline").alias("q1_headline"),
+        col("q2.headline").alias("q2_headline"),
+        col("q1.timestamp").alias("q1_timestamp"),
+        col("q2.timestamp").alias("q2_timestamp"),
+        find_lsh_sim("q1.lsh_hash", "q2.lsh_hash").alias("lsh_sim")
+    ).sort("q1_timestamp", "q2_timestamp")
+
+    # Duplicate candidates have a high enough LSH similarity count
+    lsh_cand_df = lsh_sim_df.filter(lsh_sim_df.lsh_sim >= config.LSH_SIMILARITY_BAND_COUNT)
+
+    # Compare MinHash jaccard similarity scores for duplicate candidates
+    find_mh_js = udf(lambda x, y: mh.jaccard_sim_score(x, y))
+    mh_cand_df = lsh_cand_df.withColumn("mh_js", find_mh_js(lsh_cand_df.q1_min_hash, lsh_cand_df.q2_min_hash))
+
+    # Duplicate candidates need to have a high enough MinHash Jaccard similarity score
+    dup_cand_df = mh_cand_df.filter(mh_cand_df.mh_js >= config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+
+    print("number of partitions: ", dup_cand_df.rdd.getNumPartitions())
+    dup_cand_df.foreachPartition(lambda rdd: store_dup_cand_redis(rdd))
+    """
 
 
 # understanding LSH parameters:
@@ -119,7 +158,6 @@ def find_dup_cands_within_tags(mh, lsh):
 # LSH at UBER: https://eng.uber.com/lsh/
 def run_minhash_lsh():
     df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED)
-    if config.LOG_DEBUG: print(df.first())
     #  Create and save MinHash and LSH if not exist or load them from file
     if(not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
         mh = min_hash.MinHash(config.MIN_HASH_K_VALUE)

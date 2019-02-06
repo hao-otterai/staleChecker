@@ -26,8 +26,6 @@ import util
 
 from pyspark.sql.functions import unix_timestamp
 
-def write_aws_s3(bucket_name, file_name, df):
-    df.write.save("s3a://{0}/{1}".format(bucket_name, file_name), format="json", mode="overwrite")
 
 
 # Stems words
@@ -148,14 +146,8 @@ def preprocess_file(bucket_name, file_name):
         print("[UPLOAD]: Writing preprocessed data to AWS...")
 
     # Write to AWS
-    write_aws_s3(config.S3_BUCKET_BATCH_PREPROCESSED, file_name, preprocessed_data)
+    util.write_json_aws_s3(config.S3_BUCKET_BATCH_PREPROCESSED, file_name, preprocessed_data)
 
-
-def preprocess_all():
-    bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
-    for csv_obj in bucket.objects.all():
-        preprocess_file(config.S3_BUCKET_BATCH_RAW, csv_obj.key)
-        print("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, csv_obj.key))
 
 def main():
     spark_conf = SparkConf().setAppName("news preprocesser").set("spark.cores.max", "30")
@@ -169,7 +161,10 @@ def main():
     sql_context = SQLContext(sc)
 
     start_time = time.time()
-    preprocess_all()
+    bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
+    for csv_obj in bucket.objects.all():
+        preprocess_file(config.S3_BUCKET_BATCH_RAW, csv_obj.key)
+        print("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, csv_obj.key))
 
     end_time = time.time()
     print("Preprocessing run time (seconds): {0}".format(end_time - start_time))
