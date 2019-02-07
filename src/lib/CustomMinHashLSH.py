@@ -4,7 +4,7 @@ import time
 import json
 import itertools
 import mmh3
-import pickle  # Need to dump tuple to bytes so mmh3 can hash it
+import pickle
 import numpy as np
 
 from pyspark.conf import SparkConf
@@ -23,51 +23,11 @@ import util
 global sc
 global sql_context
 
-import MinHash, LSH
-
-
-class MinHash(object):
-    def __init__(self, k, random_seed=50):
-        self._k = k
-        self._random_seed = random_seed
-        self._masks = (np.random.RandomState(seed=self._random_seed).randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, self._k))
-
-    def update_min_hash_signature(self, word, min_hash_signature):
-        root_hash = mmh3.hash64(word.encode("ascii", "ignore"))[0]
-        # root_hash = mmh3.hash64(pickle.dumps(word))[0]  # For MinHashing shingles
-        word_hashes = np.bitwise_xor(self._masks, root_hash)  # XOR root hash with k randomly generated integers to simulate k hash functions, can add bitroll if there's time
-        min_hash_signature = np.minimum(min_hash_signature, word_hashes)
-        return min_hash_signature
-
-    def calc_min_hash_signature(self, tokens):
-        min_hash_signature = np.empty(self._k, dtype=np.int64)
-        min_hash_signature.fill(np.iinfo(np.int64).max)
-        for token in tokens:
-            min_hash_signature = self.update_min_hash_signature(token, min_hash_signature)
-        return min_hash_signature
-
-
-
-class LSH(object):
-    def __init__(self, num_bands, band_width, num_buckets=1000, random_seed=50):
-        self._num_bands = num_bands
-        self._band_width = band_width
-        self._num_buckets = num_buckets
-
-    def find_lsh_buckets(self, hash_signature):
-        bands = [tuple(hash_signature[i:i + self._band_width]) for i in range(0, len(hash_signature), self._band_width)]
-        lsh_hashes = [(mmh3.hash64(pickle.dumps(row))[0] % self._num_buckets) for row in bands]
-        return lsh_hashes
-
-    def common_bands_count(self, a, b):
-        return len(set(a) & set(b))
-
-    def common_bands_ratio(self, a, b):
-        return len(set(a) & set(b)) / (1.0 * self._num_bands)
+from MinHash import *
+from LSH import *
 
 
 class CustomMinHashLSH(object):
-
     def __init__(self, ):
         # conf = SparkConf()
         # self.sc = SparkContext.getOrCreate(conf=conf)
@@ -75,16 +35,15 @@ class CustomMinHashLSH(object):
         # self.sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/util.py")
         # self.sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
         # self.sql_context = SQLContext(sc)
-
         self.jaccard_similarity = {}
         self.init_mh_lsh()
-
 
     def init_mh_lsh(self,):
         #  Create and save MinHash and LSH if not exist or load them from file
         if(not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
             self.mh = MinHash(config.MIN_HASH_K_VALUE)
             self.lsh = LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
+            print('saving mh, lsh to file {}, {}'.format(config.MIN_HASH_PICKLE, config.LSH_PICKLE))
             util.save_pickle_file(self.mh, config.MIN_HASH_PICKLE)
             util.save_pickle_file(self.lsh, config.LSH_PICKLE)
         else:

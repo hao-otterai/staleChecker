@@ -17,7 +17,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) +
 import config
 import util
 
-from CustomMinHashLSH import MinHash, LSH, CustomMinHashLSH
+from MinHash import MinHash
+from LSH import LSH 
+from CustomMinHashLSH import CustomMinHashLSH
 
 
 
