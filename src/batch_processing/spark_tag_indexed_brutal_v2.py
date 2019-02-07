@@ -42,7 +42,6 @@ def compute_minhash_lsh(df, mh, lsh):
 def store_lsh_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for q in rdd:
-        if config.LOG_DEBUG: print("tag_company: {}".format(q.tag_company))
         for tag in q.tag_company:
             q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
             rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
@@ -99,12 +98,12 @@ def find_similar_cand_with_lsh(df):
     # find bucket hashes which have multiple news_ids
 
     def _extend(a,b):
-        # both a, b are list.
+        # both a, b are list
         a.extend(b)
         return a
 
     _candidates_with_common_bucket = df.select(col('id'), col('headline'), col('min_hash'), col('lsh_hash')).rdd.flatMap(
-        lambda x: [((hash, band), [(x[0], x[1], x[2])]) for band, hash in enumerate(x[3])]).reduceByKey(
+        lambda x: ((hash, band), [(x[0], x[1], x[2])]) for band, hash in enumerate(x[3])).reduceByKey(
         lambda a, b: _extend(a,b)).filter(lambda x: len(x[1]) > 1).distinct()
     #.map(lambda x: tuple(x[1][n:n+3] for n in range(0,len(x[1]),3)))
     print(_candidates_with_common_bucket.collect())
