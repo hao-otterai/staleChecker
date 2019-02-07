@@ -44,7 +44,6 @@ def store_lsh_redis(rdd):
     for q in rdd:
         if config.LOG_DEBUG: print("tag_company: {}".format(q.tag_company))
         for tag in q.tag_company:
-            if config.LOG_DEBUG: print("tag: {}".format(tag))
             q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
             rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
             rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
@@ -98,9 +97,15 @@ def find_similar_cand_with_lsh(df):
     # broadcase the data
     # find for each hash bucket the set of news_ids
     # find bucket hashes which have multiple news_ids
+
+    def _extend(a,b):
+        # both a, b are list.
+        a.extend(b)
+        return a
+
     _candidates_with_common_bucket = df.select(col('id'), col('headline'), col('min_hash'), col('lsh_hash')).rdd.flatMap(
         lambda x: [((hash, band), [(x[0], x[1], x[2])]) for band, hash in enumerate(x[3])]).reduceByKey(
-        lambda a, b: a.extend(b)).filter(lambda x: len(x[1]) > 1).distinct()
+        lambda a, b: _extend(a,b)).filter(lambda x: len(x[1]) > 1).distinct()
     #.map(lambda x: tuple(x[1][n:n+3] for n in range(0,len(x[1]),3)))
     print(_candidates_with_common_bucket.collect())
 
