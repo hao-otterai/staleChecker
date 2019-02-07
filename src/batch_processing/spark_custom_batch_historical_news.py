@@ -129,13 +129,13 @@ def find_similar_cands_lsh(df):
     # candidates_with_common_bucket = df.select(col('id'), col('headline'), col('min_hash'), col('lsh_hash')).rdd.flatMap(
     #     lambda x: (((hash, band), [(x[0], x[1], x[2])]) for band, hash in enumerate(x[3]))).reduceByKey(
     #     lambda a, b: _extend(a,b)).map(lambda x: x[1]).filter(lambda x: len(x)>1).distinct()
-    if LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(candidates_with_common_bucket.first()))
+    if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(candidates_with_common_bucket.first()))
 
     rdd_dataset = candidates_with_common_bucket.map(lambda candiate_sets: get_jaccard_similarity(df, candidate_sets))
-    if LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_dataset.first()))
+    if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_dataset.first()))
 
     similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: lsh.merge_result(acc, val)).collectAsMap()
-    if LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_sets_dict.first()))
+    if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_sets_dict.first()))
 
     return similar_sets_dict
 
