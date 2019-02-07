@@ -91,9 +91,8 @@ def find_dup_cands_within_tags():
         tq_df = sql_context.read.json(sc.parallelize(tq))
 
         # find top similar set within a time window
-        _similar_sets_dict = find_similar_cands_lsh(tq_df)
-
-        print(_similar_sets_dict)
+        similar_sets_dict = find_similar_cands_lsh(tq_df)
+        print(similar_sets_dict)
 
         # find_lsh_sim = udf(lambda x, y: util.common_bands_count(x, y), IntegerType())
         # lsh_sim_df = tq_df.alias("q1").join(tq_df.alias("q2"),
@@ -127,7 +126,7 @@ def find_similar_cands_lsh(df):
     # find set of news ids which have at least one common lsh bucket
     candidates_with_common_bucket = df.select(col('lsh_hash'), col('id')).rdd.flatMap(
         lambda x: (((hash, band), [x[1]]) for band, hash in enumerate(x[0]))).reduceByKey(
-        lambda a, b: util._extend(a,b)).map(lambda x: x[1]).filter(lambda x: len(x)>1).distinct()
+        lambda a, b: util._extend(a,b)).map(lambda x: tuple(x[1])).filter(lambda x: len(x)>1).distinct()
     # candidates_with_common_bucket = df.select(col('id'), col('headline'), col('min_hash'), col('lsh_hash')).rdd.flatMap(
     #     lambda x: (((hash, band), [(x[0], x[1], x[2])]) for band, hash in enumerate(x[3]))).reduceByKey(
     #     lambda a, b: _extend(a,b)).map(lambda x: x[1]).filter(lambda x: len(x)>1).distinct()
@@ -195,12 +194,9 @@ def main():
     sql_context = SQLContext(sc)
 
     start_time = time.time()
-    # load historical data
-    df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED)
-
-    # Compute MinHash/LSH hashes for historical news
-    mh, lsh = load_mh_lsh()
-    #compute_minhash_lsh(df, mh, lsh)
+    #df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED) # load historical data
+    #mh, lsh = load_mh_lsh()
+    #compute_minhash_lsh(df, mh, lsh) # Compute MinHash/LSH hashes for historical news
 
     # Compute pairwise LSH similarities for news within tags
     if (config.LOG_DEBUG): print("[BATCH]: Fetching questions,comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
