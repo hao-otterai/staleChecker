@@ -1,5 +1,6 @@
 import mmh3
 import numpy as np
+import pickle
 
 class LSH(object):
     def __init__(self, num_bands, band_width, num_buckets=1000, random_seed=50):
