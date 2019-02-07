@@ -23,6 +23,8 @@ import util
 global sc
 global sql_context
 
+import MinHash, LSH
+
 
 class MinHash(object):
     def __init__(self, k, random_seed=50):
@@ -86,8 +88,11 @@ class CustomMinHashLSH(object):
             util.save_pickle_file(self.mh, config.MIN_HASH_PICKLE)
             util.save_pickle_file(self.lsh, config.LSH_PICKLE)
         else:
+            if config.LOG_DEBUG: print('loading mh and lsh from local files')
             self.mh = util.load_pickle_file(config.MIN_HASH_PICKLE)
             self.lsh = util.load_pickle_file(config.LSH_PICKLE)
+        if config.LOG_DEBUG: print('mh and lsh init finished')
+
 
 
     def compute_minhash_lsh(self, df):
