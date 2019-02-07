@@ -103,10 +103,12 @@ def find_similar_cand_with_lsh(df):
         return a
 
     _candidates_with_common_bucket = df.select(col('id'), col('headline'), col('min_hash'), col('lsh_hash')).rdd.flatMap(
-        lambda x: (((hash, band), [(x[0], x[1], x[2])]) for band, hash in enumerate(x[3]))).reduceByKey(
+        lambda x: (((hash, band), [(x[0], x[1], x[2])]) for band, hash in enumerate(x[3])))
+    print(_candidates_with_common_bucket.first())
+    _candidates_with_common_bucket = _candidates_with_common_bucket.reduceByKey(
         lambda a, b: _extend(a,b)).map(lambda x: tuple(x[1])).filter(lambda x: len(x)>1).distinct()
     #.map(lambda x: tuple(x[1][n:n+3] for n in range(0,len(x[1]),3)))
-    print(_candidates_with_common_bucket.collect())
+    print(_candidates_with_common_bucket.first())
 
     # calculate the number of common buckets each candidate pair has
     # candidate list should be those which have at least certain amount of common buckets
