@@ -142,6 +142,7 @@ def find_similar_cands_lsh(df):
 
 
 def get_jaccard_similarity(df, candidate_sets):
+    start_time = time.time()
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     # Input whole df to calculate similar sets base on candidate_sets
     # create base set and its similar sets in a dictionary.
@@ -175,6 +176,8 @@ def get_jaccard_similarity(df, candidate_sets):
                         for k,v in _similar_dict.items() if len(v)>0])
 
     if DEBUG: print('get_jaccard_similarity=> _similar_dict=%s'%(_similar_dict))
+    end_time = time.time()
+    print("get_jaccard_similarity run time (seconds): {0} seconds".format(end_time - start_time))
     return _similar_dict
 
 
