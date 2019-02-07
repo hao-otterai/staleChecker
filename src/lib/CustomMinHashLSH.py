@@ -111,7 +111,7 @@ class CustomMinHashLSH(object):
         #     lambda x: (((hash, band), [(x[0], x[1], x[2])]) for band, hash in enumerate(x[3]))).reduceByKey(
         #     lambda a, b: _extend(a,b)).map(lambda x: x[1]).filter(lambda x: len(x)>1).distinct()
 
-        rdd_dataset = _candidates_with_common_bucket.map(lambda candiate_sets: self.get_jaccard_similarity(candidate_sets))
+        rdd_dataset = _candidates_with_common_bucket.map(lambda candiate_sets: self.get_jaccard_similarity(df, candidate_sets))
         _similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: lsh.merge_result(acc, val)).collectAsMap()
 
         return _similar_sets_dict

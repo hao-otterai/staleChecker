@@ -34,7 +34,7 @@ def compute_minhash_lsh(df, mh, lsh):
 
 
 # Store question data
-def store_lsh_redis(rdd):
+def store_lsh_redis_by_topic(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for q in rdd:
         for tag in q.tag_company:
@@ -145,12 +145,28 @@ def main():
     global sql_context
     sql_context = SQLContext(sc)
 
+    start_time = time.time()
+    #run_minhash_lsh()
     # load historical data
     df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED)
 
-    start_time = time.time()
-    #run_minhash_lsh()
+    # CustomMinHashLSH object init
     custom_lsh = CustomMinHashLSH()
+
+    # Compute MinHash/LSH hashes for every question
+    if (config.LOG_DEBUG): print("[BATCH]: Calculating MinHash hashes and LSH hashes...")
+    df = custom_lsh.compute_minhash_lsh(df)
+
+    # save df to Redis and organize by topic
+    df.foreachPartition(store_lsh_redis_by_topic)
+
+    # Compute pairwise LSH similarities for questions within tags
+    if (config.LOG_DEBUG): print("[BATCH]: Fetching questions, comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
+    #find_dup_cands_within_tags(mh, lsh)
+
+    candidate_sets = custom_lsh.find_similar_cands(df)
+    print('candiate_sets: {}'.format(candidate_sets))
+    #candidate_sets.foreachPartition(lambda rdd: store_dup_cand_redis(rdd))
 
     end_time = time.time()
     print("Spark Custom MinHashLSH run time (seconds): {0} seconds".format(end_time - start_time))
