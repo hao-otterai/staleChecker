@@ -18,7 +18,7 @@ import config
 import util
 
 from MinHash import MinHash
-from LSH import LSH 
+from LSH import LSH
 from CustomMinHashLSH import CustomMinHashLSH
 
 
@@ -140,6 +140,8 @@ def main():
     global sc
     sc = SparkContext(conf=spark_conf)
     sc.setLogLevel("ERROR")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/MinHash.py")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/LSH.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/CustomMinHashLSH.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/util.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")

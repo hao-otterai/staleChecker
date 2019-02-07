@@ -23,10 +23,6 @@ import util
 global sc
 global sql_context
 
-from MinHash import *
-from LSH import *
-
-
 class CustomMinHashLSH(object):
     def __init__(self, ):
         # conf = SparkConf()
