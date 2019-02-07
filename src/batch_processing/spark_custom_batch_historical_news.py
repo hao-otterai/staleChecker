@@ -151,7 +151,8 @@ def get_jaccard_similarity(df, candidate_sets):
     if config.LOG_DEBUG: print('get_jaccard_similarity=>candidate_sets=%s'%(str(candidate_sets)))
 
     # Generate combination for each set in candidate sets.
-    candidate_df = df.filter('id' in candidate_sets).orderBy(df.timestamp.asc()).collect()
+    #candidate_df = df.filter('id' in candidate_sets).orderBy(df.timestamp.asc()).collect()
+    candidate_df = [df.filter('id' = cand) for cand in candidate_sets]
     if config.LOG_DEBUG: print('get_jaccard_similarity=>candidate_df=%s'%(str(candidate_df)))
 
     for _b_set, _s_set in itertools.permutations(candidate_df,2):
