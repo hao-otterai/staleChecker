@@ -17,8 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) +
 import config
 import util
 
-import min_hash
-import locality_sensitive_hash
+from CustomMinHashLSH import MinHash, LSH, CustomMinHashLSH
 
 
 
@@ -115,8 +114,8 @@ def run_minhash_lsh():
     if config.LOG_DEBUG: print(df.first())
     #  Create and save MinHash and LSH if not exist or load them from file
     if(not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
-        mh = min_hash.MinHash(config.MIN_HASH_K_VALUE)
-        lsh = locality_sensitive_hash.LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
+        mh = MinHash(config.MIN_HASH_K_VALUE)
+        lsh = LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
         util.save_pickle_file(mh, config.MIN_HASH_PICKLE)
         util.save_pickle_file(lsh, config.LSH_PICKLE)
     else:
