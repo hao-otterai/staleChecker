@@ -6,14 +6,19 @@ import time
 import pickle
 
 from functools import reduce
-
 from pyspark.sql import DataFrame
+from pyspark.ml.feature import HashingTF, IDF
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
 import config
 
 global sql_context
 ''' General utility functions (not including database functions) used across multiple files '''
+
+
+def _extend(a,b): # both a, b are list
+    a.extend(b)
+    return a
 
 # Returns first common tag between two tag lists, may not be the main tag
 def common_tag(x, y):
@@ -63,6 +68,28 @@ def save_pickle_file(data, filename):
 
 def write_json_aws_s3(bucket_name, file_name, df):
     df.write.save("s3a://{0}/{1}".format(bucket_name, file_name), format="json", mode="overwrite")
+
+
+def jaccard_sim_score(x, y):
+    intersection = set(list(x)).intersection(set(list(y)))
+    union = set(list(x)).union(set(list(y)))
+    return len(intersection) / (len(union) * 1.0)
+
+def sim_count(x, y):
+    return len(set(list(x)).intersection(set(list(y))))
+
+
+
+# calculate TF-IDF
+def compute_tf_idf(documents, minDocFreq):
+    hashingTF = HashingTF()
+    tf = hashingTF.transform(documents)
+    # While applying HashingTF only needs a single pass to the data, applying IDF needs two passes:
+    # First to compute the IDF vector and second to scale the term frequencies by IDF.
+    tf.cache()
+    idf = IDF(minDocFreq=minDocFreq).fit(tf)
+    tfidf = idf.transform(tf)
+    return tfidf
 
 
 #

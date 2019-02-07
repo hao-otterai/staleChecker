@@ -9,11 +9,6 @@ from pyspark.sql import SQLContext
 from pyspark.sql.functions import udf, col
 import redis
 
-from pyspark.conf import SparkConf
-from pyspark.context import SparkContext
-from pyspark.sql import SQLContext
-from pyspark.sql.functions import udf, col
-
 from pyspark.sql.types import IntegerType, ArrayType, StringType
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
@@ -21,14 +16,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) +
 import config
 import util
 
-import min_hash
-import locality_sensitive_hash
-
-from pyspark.ml.feature import MinHashLSH, VectorAssembler, HashingTF, IDF
+from CustomMinHashLSH import *
 
 
+#==========================================
 # Computes MinHashes, LSHes for all in DataFrame
 def compute_minhash_lsh(df, mh, lsh):
+    # Compute MinHash/LSH hashes for input questions
+    if (config.LOG_DEBUG): print("[BATCH]: Calculating MinHash hashes and LSH hashes...")
     calc_min_hash = udf(lambda x: list(map(lambda x: int(x), mh.calc_min_hash_signature(x))), ArrayType(IntegerType()))
     calc_lsh_hash = udf(lambda x: list(map(lambda x: int(x), lsh.find_lsh_buckets(x))), ArrayType(IntegerType()))
 
@@ -57,15 +52,6 @@ def store_dup_cand_redis(rdd):
         rdb.zadd("dup_cand", cand.mh_js, cand_reformatted)
 
 
-# Store LSH similarity data
-def store_spark_mllib_tag_indexed_sim_redis(rdd):
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-    for sim in rdd:
-        if(sim.jaccard_sim > config.DUP_QUESTION_IDENTIFY_THRESHOLD):
-            q_pair = (sim.tag, sim.q1_id, sim.q1_title, sim.q2_id, sim.q2_title)
-            rdb.zadd("spark_mllib_tag_indexed_sim", sim.jaccard_sim, q_pair)
-
-
 # Compares LSH signatures, MinHash signature, and find duplicate candidates
 def find_dup_cands_within_tags(mh, lsh):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
@@ -82,32 +68,25 @@ def find_dup_cands_within_tags(mh, lsh):
         if config.LOG_DEBUG: print("tag {0}: {1} news".format(tag, len(tq)))
 
         tq_df = sql_context.read.json(sc.parallelize(tq))
-        find_similar_cand_with_lsh(tq_df)
-        break
+        find_dup_cands_lsh(tq_df, lsh)
 
 
-def find_similar_cand_with_lsh(df):
-    if config.LOG_DEBUG: print('implementing LSH for finding similar candidates')
-    ### spark officla LSH implementation: https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/feature/LSH.scala
-
-    # explode the dataframe with news_id, lash_hash :
-    # explode: https://hadoopist.wordpress.com/2016/05/16/how-to-handle-nested-dataarray-of-structures-or-multiple-explodes-in-sparkscala-and-pyspark/
-
+def find_dup_cands_lsh(df, lsh):
     # broadcase the data
-    # find for each hash bucket the set of news_ids
-    # find bucket hashes which have multiple news_ids
 
-    def _extend(a,b):
-        # both a, b are list
-        a.extend(b)
-        return a
+    # find set of news ids which have at least one common lsh bucket
+    _candidates_with_common_bucket = df.select(col('lsh_hash'), col('id')).rdd.flatMap(
+        lambda x: (((hash, band), [x[1]]) for band, hash in enumerate(x[0]))).reduceByKey(
+        lambda a, b: util._extend(a,b)).map(lambda x: x[1]).filter(lambda x: len(x)>1).distinct()
 
-    _candidates_with_common_bucket = df.select(col('id'), col('headline'), col('min_hash'), col('lsh_hash')).rdd.flatMap(
-        lambda x: (((hash, band), [(x[0], x[1], x[2])]) for band, hash in enumerate(x[3]))).reduceByKey(lambda a, b: _extend(a,b)).map(
-	lambda x: x[1]).filter(lambda x: len(x)>1).distinct()
-    print(_candidates_with_common_bucket)
+    # _candidates_with_common_bucket = df.select(col('id'), col('headline'), col('min_hash'), col('lsh_hash')).rdd.flatMap(
+    #     lambda x: (((hash, band), [(x[0], x[1], x[2])]) for band, hash in enumerate(x[3]))).reduceByKey(
+    #     lambda a, b: _extend(a,b)).map(lambda x: x[1]).filter(lambda x: len(x)>1).distinct()
 
+    rdd_dataset = _candidates_with_common_bucket.map(lambda candiate_sets: lsh.get_jaccard_similarity(candidate_sets))
+    _similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: lsh.merge_result(acc, val)).collectAsMap()
 
+    return _similar_sets_dict
 
     # calculate the number of common buckets each candidate pair has
     # candidate list should be those which have at least certain amount of common buckets
@@ -163,10 +142,11 @@ def find_similar_cand_with_lsh(df):
 # LSH at UBER: https://eng.uber.com/lsh/
 def run_minhash_lsh():
     df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED)
+
     #  Create and save MinHash and LSH if not exist or load them from file
     if(not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
-        mh = min_hash.MinHash(config.MIN_HASH_K_VALUE)
-        lsh = locality_sensitive_hash.LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
+        mh = MinHash(config.MIN_HASH_K_VALUE)
+        lsh = LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
         util.save_pickle_file(mh, config.MIN_HASH_PICKLE)
         util.save_pickle_file(lsh, config.LSH_PICKLE)
     else:
@@ -183,13 +163,12 @@ def run_minhash_lsh():
 
 
 def main():
-    spark_conf = SparkConf().setAppName("Spark Custom MinHashLSH").set("spark.cores.max", "30")
+    spark_conf = SparkConf().setAppName("Spark CustomMinHashLSH").set("spark.cores.max", "30")
 
     global sc
     sc = SparkContext(conf=spark_conf)
     sc.setLogLevel("ERROR")
-    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/min_hash.py")
-    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/locality_sensitive_hash.py")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/CustomMinHashLSH.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/util.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
 

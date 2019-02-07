@@ -7,24 +7,19 @@ from pyspark.conf import SparkConf
 from pyspark.context import SparkContext
 from pyspark.sql import SQLContext
 from pyspark.sql.functions import udf, col
-import redis
-
-from pyspark.conf import SparkConf
-from pyspark.context import SparkContext
-from pyspark.sql import SQLContext
-from pyspark.sql.functions import udf, col
-
 from pyspark.sql.types import IntegerType, ArrayType, StringType
+
+import redis
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib")
+
 import config
 import util
 
 import min_hash
 import locality_sensitive_hash
 
-from pyspark.ml.feature import MinHashLSH, VectorAssembler, HashingTF, IDF
 
 
 # Computes MinHashes, LSHes for all in DataFrame
@@ -80,8 +75,6 @@ def find_dup_cands_within_tags(mh, lsh):
 
         if config.LOG_DEBUG: print("{0} news".format(len(tq)))
         tq_df = sql_context.read.json(sc.parallelize(tq))
-
-
 
         ### this is a major performance limiting step which should be optimized
         find_lsh_sim = udf(lambda x, y: lsh.common_bands_count(x, y), IntegerType())
@@ -140,21 +133,25 @@ def run_minhash_lsh():
 
 
 def main():
-    spark_conf = SparkConf().setAppName("Spark Custom MinHashLSH").set("spark.cores.max", "30")
+    spark_conf = SparkConf().setAppName("Spark CustomMinHashLSH").set("spark.cores.max", "30")
 
     global sc
     sc = SparkContext(conf=spark_conf)
     sc.setLogLevel("ERROR")
-    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/min_hash.py")
-    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/locality_sensitive_hash.py")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/CustomMinHashLSH.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/util.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
 
     global sql_context
     sql_context = SQLContext(sc)
 
+    # load historical data
+    df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED)
+
     start_time = time.time()
-    run_minhash_lsh()
+    #run_minhash_lsh()
+    custom_lsh = CustomMinHashLSH()
+
     end_time = time.time()
     print("Spark Custom MinHashLSH run time (seconds): {0} seconds".format(end_time - start_time))
 
