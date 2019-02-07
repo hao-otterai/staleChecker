@@ -65,7 +65,6 @@ def store_lsh_redis_by_topic(rdd):
             print("ERROR: failed to save tag {0} to Redis".format(tag))
 
 
-
 # Store duplicate candidates in Redis
 def store_dup_cand_redis(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
@@ -124,16 +123,21 @@ def find_dup_cands_within_tags():
 
 def find_similar_cands_lsh(df):
     # find set of news ids which have at least one common lsh bucket
-    _candidates_with_common_bucket = df.select(col('lsh_hash'), col('id')).rdd.flatMap(
+    candidates_with_common_bucket = df.select(col('lsh_hash'), col('id')).rdd.flatMap(
         lambda x: (((hash, band), [x[1]]) for band, hash in enumerate(x[0]))).reduceByKey(
         lambda a, b: util._extend(a,b)).map(lambda x: x[1]).filter(lambda x: len(x)>1).distinct()
-    # _candidates_with_common_bucket = df.select(col('id'), col('headline'), col('min_hash'), col('lsh_hash')).rdd.flatMap(
+    # candidates_with_common_bucket = df.select(col('id'), col('headline'), col('min_hash'), col('lsh_hash')).rdd.flatMap(
     #     lambda x: (((hash, band), [(x[0], x[1], x[2])]) for band, hash in enumerate(x[3]))).reduceByKey(
     #     lambda a, b: _extend(a,b)).map(lambda x: x[1]).filter(lambda x: len(x)>1).distinct()
+    if LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(candidates_with_common_bucket.first()))
 
-    rdd_dataset = _candidates_with_common_bucket.map(lambda candiate_sets: get_jaccard_similarity(df, candidate_sets))
-    _similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: lsh.merge_result(acc, val)).collectAsMap()
-    return _similar_sets_dict
+    rdd_dataset = candidates_with_common_bucket.map(lambda candiate_sets: get_jaccard_similarity(df, candidate_sets))
+    if LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_dataset.first()))
+
+    similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: lsh.merge_result(acc, val)).collectAsMap()
+    if LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_sets_dict.first()))
+
+    return similar_sets_dict
 
 
 def get_jaccard_similarity(df, candidate_sets):
@@ -192,9 +196,9 @@ def main():
     # load historical data
     df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED)
 
-    mh, lsh = load_mh_lsh()
     # Compute MinHash/LSH hashes for historical news
-    df = compute_minhash_lsh(df, mh, lsh)
+    mh, lsh = load_mh_lsh()
+    #compute_minhash_lsh(df, mh, lsh)
 
     # Compute pairwise LSH similarities for news within tags
     if (config.LOG_DEBUG): print("[BATCH]: Fetching questions,comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
