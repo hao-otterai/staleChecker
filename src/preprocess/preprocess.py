@@ -53,7 +53,7 @@ def get_tri_gram_shingles(tokens):
     return [(tokens[i], tokens[i + 1], tokens[i + 2]) for i in range(len(tokens) - 2)]
 
 def generate_tag(input_string):
-    return input_string.replace('/','_').split("||") if len(input_string)>0 else ['<UNS>']
+    return input_string.replace('/','_').split(";") if len(input_string)>0 else ['<UNS>']
 
 # Preprocess a data file and upload it
 def preprocess_file(bucket_name, file_name):

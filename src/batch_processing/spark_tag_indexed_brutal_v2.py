@@ -98,11 +98,9 @@ def find_similar_cand_with_lsh(df):
     # find for each hash bucket the set of news_ids
 
     # find bucket hashes which have multiple news_ids
-    test = df.select(col('id'), col('lsh_hash')).rdd.flatMap(lambda x: [((hash, i), x[0]) for i, hash in enumerate(x[1])])
-    print(test.first())
-
-    test2 = test.reduceByKey(lambda a, b: a+','+b).map(lambda x: tuple(x[1].split(','))).filter(len(x[1]) > 1).distinct()
-    print(test2)
+    test = df.select(col('id'), col('lsh_hash')).rdd.flatMap(lambda x: [((hash, i), x[0]) for i, hash in enumerate(x[1])]).reduceByKey(
+        lambda a, b: a+','+b).map(lambda x: tuple(x[1].split(','))).filter(lambda x: len(x[1]) > 1).distinct()
+    print(test2.collect())
 
     # calculate the number of common buckets each candidate pair has
     # candidate list should be those which have at least certain amount of common buckets
