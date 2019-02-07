@@ -49,16 +49,6 @@ def compute_minhash_lsh(df, mh, lsh):
     df.foreachPartition(store_lsh_redis_by_topic)
     return df
 
-# # Store question data
-# def store_lsh_redis(rdd):
-#     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-#     for q in rdd:
-#         for tag in q.tag_company:
-#             q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
-#                     "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
-#             rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
-#             rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
-
 # Store question data
 def store_lsh_redis_by_topic(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
@@ -66,8 +56,7 @@ def store_lsh_redis_by_topic(rdd):
     for q in rdd:
         q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
                     "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
-        if config.LOG_DEBUG:
-            print("Storing the tags {0} and content {1} to Redis...".format(q.tag_company, q_json))
+        #if config.LOG_DEBUG: print("Storing the tags {0} and content {1} to Redis...".format(q.tag_company, q_json))
         try:
             for tag in q.tag_company:
                 rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
@@ -79,7 +68,7 @@ def store_lsh_redis_by_topic(rdd):
 
 # Store duplicate candidates in Redis
 def store_dup_cand_redis(rdd):
-    # rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for cand in rdd:
         cand_reformatted = (cand.q1_id, cand.q1_headline, cand.q2_id, cand.q2_headline, cand.q1_timestamp, cand.q2_timestamp)
         # Store by time
@@ -88,6 +77,7 @@ def store_dup_cand_redis(rdd):
 
 # Compares LSH signatures, MinHash signature, and find duplicate candidates
 def find_dup_cands_within_tags():
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     # Fetch all tags from lsh_keys set
     for lsh_key in rdb.sscan_iter("lsh_keys", match="*", count=500):
         tag = lsh_key.replace("lsh:", "")
@@ -147,6 +137,7 @@ def find_similar_cands_lsh(df):
 
 
 def get_jaccard_similarity(df, candidate_sets):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     # Input whole df to calculate similar sets base on candidate_sets
     # create base set and its similar sets in a dictionary.
     # return = {base_set:(similar_set:jaccard_similarity, )}
@@ -196,9 +187,6 @@ def main():
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
     global sql_context
     sql_context = SQLContext(sc)
-
-    global rdb
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
     start_time = time.time()
     # load historical data
