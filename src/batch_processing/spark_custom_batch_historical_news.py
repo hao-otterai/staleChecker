@@ -45,11 +45,7 @@ def compute_minhash_lsh(df, mh, lsh):
     df = df.withColumn("min_hash", calc_min_hash("text_body_stemmed"))
     df = df.withColumn("lsh_hash", calc_lsh_hash("min_hash"))
 
-    try:
-        df.foreachPartition(store_lsh_redis_by_topic)
-    except Exception as e:
-        print("ERROR: failed to save minhash lsh by tpic to Redis")
-
+    df.foreachPartition(store_lsh_redis_by_topic)
     return df
 
 
@@ -59,10 +55,16 @@ def store_lsh_redis_by_topic(rdd):
     for q in rdd:
         q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
                     "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
-        print(q_json)
-        for tag in q.tag_company:
-            rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
-            rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+        if config.LOG_DEBUG:
+            print("Storing the tags {0} and content {1} to Redis...".format(q.tag_company, q_json))
+        try:
+            for tag in q.tag_company:
+                rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
+                rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+        except Exception as e:
+            print("ERROR: failed to save tag {0} to Redis".format(tag))
+
+
 
 # Store duplicate candidates in Redis
 def store_dup_cand_redis(rdd):

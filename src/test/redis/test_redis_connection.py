@@ -15,7 +15,7 @@ def hello_redis():
         # The decode_repsonses flag here directs the client to convert the responses from Redis into Python strings
         # using the default encoding utf-8.  This is client specific.
         r = redis.StrictRedis(host=redis_host, port=redis_port, password=redis_password, decode_responses=True)
-        # step 4: Set the hello message in Redis 
+        # step 4: Set the hello message in Redis
         r.set("msg:hello", "Hello Redis!!!")
 
         # step 5: Retrieve the hello message from Redis
@@ -29,13 +29,15 @@ def basic_tests():
     print('Perform basic test of redis functions...')
     r = redis.StrictRedis(host=redis_host, port=redis_port, password=redis_password, decode_responses=True)
     import json
-    for a,b,c in zip(range(1, 5), range(3,7), range(5,9)): 
+    for a,b,c in zip(range(1, 5), range(3,7), range(5,9)):
         json_d = json.dumps({"a":a, "b":b, "c":c})
         r.sadd('test_sadd', json_d)
         r.zadd('test_zadd', a+b+c, json_d)
 
     print(r.smembers('test_sadd'))
     print(r.zrangebyscore('test_zadd', '-inf', '+inf', withscores=False))
+
+    print('test passed, redis connection is ok')
 
 if __name__ == '__main__':
     hello_redis()
