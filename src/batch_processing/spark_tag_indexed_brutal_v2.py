@@ -80,9 +80,10 @@ def find_dup_cands_within_tags(mh, lsh):
 
         # Fetch all news. ideally, sort the news by timestamp, and get within a range of timestamps
         tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
-        if config.LOG_DEBUG: print("tag ", tag, ":{0} news".format(len(tq)))
-        tq_df = sql_context.read.json(sc.parallelize(tq))
+        if len(tq) < 2: continue
+        if config.LOG_DEBUG: print("tag {0}: {1} news".format(tag, len(tq)))
 
+        tq_df = sql_context.read.json(sc.parallelize(tq))
         find_similar_cand_with_lsh(tq_df)
         break
 
@@ -98,9 +99,10 @@ def find_similar_cand_with_lsh(df):
     # find for each hash bucket the set of news_ids
 
     # find bucket hashes which have multiple news_ids
-    test = df.select(col('id'), col('lsh_hash')).rdd.flatMap(lambda x: [((hash, i), x[0]) for i, hash in enumerate(x[1])]).reduceByKey(
-        lambda a, b: a+','+b).map(lambda x: tuple(x[1].split(','))).filter(lambda x: len(x[1]) > 1).distinct()
-    print(test2.collect())
+    _candidates_with_common_bucket = df.select(col('id'), col('headline'), col('min_hash'), col('lsh_hash')).rdd.flatMap(
+        lambda x: [((hash, i), (x[0], x[1], x[2])) for i, hash in enumerate(x[3])]).reduceByKey(
+        lambda a, b: a+b).map(lambda x: tuple(x[1][n:n+3] for n in range(0,len(x[1]),3))).filter(lambda x: len(x[1]) > 1).distinct()
+    print(_candidates_with_common_bucket.collect())
 
     # calculate the number of common buckets each candidate pair has
     # candidate list should be those which have at least certain amount of common buckets
