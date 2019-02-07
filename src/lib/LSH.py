@@ -3,6 +3,7 @@ import numpy as np
 
 class LSH(object):
     def __init__(self, num_bands, band_width, num_buckets=1000, random_seed=50):
+        print("init LSH obj")
         self._num_bands = num_bands
         self._band_width = band_width
         self._num_buckets = num_buckets

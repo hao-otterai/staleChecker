@@ -3,6 +3,7 @@ import numpy as np
 
 class MinHash(object):
     def __init__(self, k, random_seed=50):
+        print("init MinHash obj")
         self._k = k
         self._random_seed = random_seed
         self._masks = (np.random.RandomState(seed=self._random_seed).randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, self._k))

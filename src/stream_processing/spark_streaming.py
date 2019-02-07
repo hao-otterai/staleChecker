@@ -16,8 +16,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib")
 import config
 import util
-from min_hash import MinHash
-from locality_sensitive_hash import LSH
+from MinHash import MinHash
+from LSH import LSH
 
 # Converts incoming question, Adds timestamp to incoming question
 ### NB - a lot of preprocessing needs to be added here
@@ -86,8 +86,8 @@ def main():
 
     global sc
     sc = SparkContext(conf=spark_conf)
-    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/min_hash.py")
-    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/locality_sensitive_hash.py")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/MinHash.py")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/LSH.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/util.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
 

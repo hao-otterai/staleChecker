@@ -24,7 +24,7 @@ global sc
 global sql_context
 
 class CustomMinHashLSH(object):
-    def __init__(self, ):
+    def __init__(self, mh, lsh):
         # conf = SparkConf()
         # self.sc = SparkContext.getOrCreate(conf=conf)
         # self.sc.setLogLevel("ERROR")
@@ -32,23 +32,8 @@ class CustomMinHashLSH(object):
         # self.sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
         # self.sql_context = SQLContext(sc)
         self.jaccard_similarity = {}
-        self.init_mh_lsh()
-
-    def init_mh_lsh(self,):
-        #  Create and save MinHash and LSH if not exist or load them from file
-        if(not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
-            self.mh = MinHash(config.MIN_HASH_K_VALUE)
-            self.lsh = LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
-            print('saving mh, lsh to file {}, {}'.format(config.MIN_HASH_PICKLE, config.LSH_PICKLE))
-            util.save_pickle_file(self.mh, config.MIN_HASH_PICKLE)
-            util.save_pickle_file(self.lsh, config.LSH_PICKLE)
-        else:
-            if config.LOG_DEBUG: print('loading mh and lsh from local files')
-            self.mh = util.load_pickle_file(config.MIN_HASH_PICKLE)
-            self.lsh = util.load_pickle_file(config.LSH_PICKLE)
-        if config.LOG_DEBUG: print('mh and lsh init finished')
-
-
+        self.mh = mh
+        self.lsh = lsh
 
     def compute_minhash_lsh(self, df):
         # Compute MinHash/LSH hashes for input questions

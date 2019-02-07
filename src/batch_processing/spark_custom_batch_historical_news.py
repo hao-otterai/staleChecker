@@ -151,19 +151,33 @@ def main():
 
     start_time = time.time()
     #run_minhash_lsh()
+
+    #  Create and save MinHash and LSH if not exist or load them from file
+    if(not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
+        mh = MinHash(config.MIN_HASH_K_VALUE)
+        lsh = LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
+        print('saving mh, lsh to file {}, {}'.format(config.MIN_HASH_PICKLE, config.LSH_PICKLE))
+        util.save_pickle_file(mh, config.MIN_HASH_PICKLE)
+        util.save_pickle_file(lsh, config.LSH_PICKLE)
+    else:
+        if config.LOG_DEBUG: print('loading mh and lsh from local files')
+        mh = util.load_pickle_file(config.MIN_HASH_PICKLE)
+        lsh = util.load_pickle_file(config.LSH_PICKLE)
+    if config.LOG_DEBUG: print('mh and lsh init finished')
+
+    # CustomMinHashLSH object init
+    custom_lsh = CustomMinHashLSH(mh, lsh)
+
     # load historical data
     df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED)
 
-    # CustomMinHashLSH object init
-    custom_lsh = CustomMinHashLSH()
-
-    # Compute MinHash/LSH hashes for every question
+    # Compute MinHash/LSH hashes for historical news
     df = custom_lsh.compute_minhash_lsh(df)
 
     # save df to Redis and organize by topic
     df.foreachPartition(store_lsh_redis_by_topic)
 
-    # Compute pairwise LSH similarities for questions within tags
+    # Compute pairwise LSH similarities for news within tags
     if (config.LOG_DEBUG): print("[BATCH]: Fetching questions, \
             comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
     find_dup_cands_within_tags()
