@@ -197,7 +197,7 @@ def main():
 
     # Compute pairwise LSH similarities for news within tags
     if (config.LOG_DEBUG): print("[BATCH]: Fetching questions,comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
-    find_dup_cands_within_tags(rdb)
+    find_dup_cands_within_tags()
 
     #candidate_sets = custom_lsh.find_similar_cands(df)
     #print('candiate_sets: {}'.format(candidate_sets))
