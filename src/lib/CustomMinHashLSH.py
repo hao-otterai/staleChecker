@@ -22,6 +22,48 @@ import util
 
 global sc
 global sql_context
+
+
+class MinHash(object):
+    def __init__(self, k, random_seed=50):
+        self._k = k
+        self._random_seed = random_seed
+        self._masks = (np.random.RandomState(seed=self._random_seed).randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, self._k))
+
+    def update_min_hash_signature(self, word, min_hash_signature):
+        root_hash = mmh3.hash64(word.encode("ascii", "ignore"))[0]
+        # root_hash = mmh3.hash64(pickle.dumps(word))[0]  # For MinHashing shingles
+        word_hashes = np.bitwise_xor(self._masks, root_hash)  # XOR root hash with k randomly generated integers to simulate k hash functions, can add bitroll if there's time
+        min_hash_signature = np.minimum(min_hash_signature, word_hashes)
+        return min_hash_signature
+
+    def calc_min_hash_signature(self, tokens):
+        min_hash_signature = np.empty(self._k, dtype=np.int64)
+        min_hash_signature.fill(np.iinfo(np.int64).max)
+        for token in tokens:
+            min_hash_signature = self.update_min_hash_signature(token, min_hash_signature)
+        return min_hash_signature
+
+
+
+class LSH(object):
+    def __init__(self, num_bands, band_width, num_buckets=1000, random_seed=50):
+        self._num_bands = num_bands
+        self._band_width = band_width
+        self._num_buckets = num_buckets
+
+    def find_lsh_buckets(self, hash_signature):
+        bands = [tuple(hash_signature[i:i + self._band_width]) for i in range(0, len(hash_signature), self._band_width)]
+        lsh_hashes = [(mmh3.hash64(pickle.dumps(row))[0] % self._num_buckets) for row in bands]
+        return lsh_hashes
+
+    def common_bands_count(self, a, b):
+        return len(set(a) & set(b))
+
+    def common_bands_ratio(self, a, b):
+        return len(set(a) & set(b)) / (1.0 * self._num_bands)
+
+
 class CustomMinHashLSH(object):
 
     def __init__(self, ):
@@ -31,7 +73,7 @@ class CustomMinHashLSH(object):
         # self.sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/util.py")
         # self.sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
         # self.sql_context = SQLContext(sc)
-        
+
         self.jaccard_similarity = {}
         self.init_mh_lsh()
 
@@ -63,7 +105,6 @@ class CustomMinHashLSH(object):
         # # Compute pairwise LSH similarities for questions within tags
         # if (config.LOG_DEBUG): print("[BATCH]: Fetching questions, comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
         # find_dup_cands_within_tags(mh, lsh)
-
 
 
     def get_jaccard_similarity(self, df, candidate_sets):
@@ -116,45 +157,3 @@ class CustomMinHashLSH(object):
         _similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: lsh.merge_result(acc, val)).collectAsMap()
 
         return _similar_sets_dict
-
-
-
-
-class MinHash(object):
-    def __init__(self, k, random_seed=50):
-        self._k = k
-        self._random_seed = random_seed
-        self._masks = (np.random.RandomState(seed=self._random_seed).randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, self._k))
-
-    def update_min_hash_signature(self, word, min_hash_signature):
-        root_hash = mmh3.hash64(word.encode("ascii", "ignore"))[0]
-        # root_hash = mmh3.hash64(pickle.dumps(word))[0]  # For MinHashing shingles
-        word_hashes = np.bitwise_xor(self._masks, root_hash)  # XOR root hash with k randomly generated integers to simulate k hash functions, can add bitroll if there's time
-        min_hash_signature = np.minimum(min_hash_signature, word_hashes)
-        return min_hash_signature
-
-    def calc_min_hash_signature(self, tokens):
-        min_hash_signature = np.empty(self._k, dtype=np.int64)
-        min_hash_signature.fill(np.iinfo(np.int64).max)
-        for token in tokens:
-            min_hash_signature = self.update_min_hash_signature(token, min_hash_signature)
-        return min_hash_signature
-
-
-
-class LSH(object):
-    def __init__(self, num_bands, band_width, num_buckets=1000, random_seed=50):
-        self._num_bands = num_bands
-        self._band_width = band_width
-        self._num_buckets = num_buckets
-
-    def find_lsh_buckets(self, hash_signature):
-        bands = [tuple(hash_signature[i:i + self._band_width]) for i in range(0, len(hash_signature), self._band_width)]
-        lsh_hashes = [(mmh3.hash64(pickle.dumps(row))[0] % self._num_buckets) for row in bands]
-        return lsh_hashes
-
-    def common_bands_count(self, a, b):
-        return len(set(a) & set(b))
-
-    def common_bands_ratio(self, a, b):
-        return len(set(a) & set(b)) / (1.0 * self._num_bands)

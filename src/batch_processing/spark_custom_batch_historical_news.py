@@ -34,6 +34,7 @@ def compute_minhash_lsh(df, mh, lsh):
 
 # Store question data
 def store_lsh_redis_by_topic(rdd):
+    if config.LOG_DEBUG: print("store minhash and lsh by topic(i.e, company)")
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for q in rdd:
         for tag in q.tag_company:
@@ -61,7 +62,7 @@ def store_spark_mllib_tag_indexed_sim_redis(rdd):
 
 
 # Compares LSH signatures, MinHash signature, and find duplicate candidates
-def find_dup_cands_within_tags(mh, lsh):
+def find_dup_cands_within_tags():
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
     # Fetch all tags from lsh_keys set
@@ -76,7 +77,7 @@ def find_dup_cands_within_tags(mh, lsh):
         tq_df = sql_context.read.json(sc.parallelize(tq))
 
         ### this is a major performance limiting step which should be optimized
-        find_lsh_sim = udf(lambda x, y: lsh.common_bands_count(x, y), IntegerType())
+        find_lsh_sim = udf(lambda x, y: util.common_bands_count(x, y), IntegerType())
         lsh_sim_df = tq_df.alias("q1").join(tq_df.alias("q2"),
             [col("q1.timestamp") < col("q2.timestamp"),
             col("q2.timestamp") - col("q1.timestamp") < config.TIME_WINDOW]).select(
@@ -95,7 +96,7 @@ def find_dup_cands_within_tags(mh, lsh):
         lsh_cand_df = lsh_sim_df.filter(lsh_sim_df.lsh_sim >= config.LSH_SIMILARITY_BAND_COUNT)
 
         # Compare MinHash jaccard similarity scores for duplicate candidates
-        find_mh_js = udf(lambda x, y: mh.jaccard_sim_score(x, y))
+        find_mh_js = udf(lambda x, y: util.jaccard_sim_score(x, y))
         mh_cand_df = lsh_cand_df.withColumn("mh_js", find_mh_js(lsh_cand_df.q1_min_hash, lsh_cand_df.q2_min_hash))
 
         # Duplicate candidates need to have a high enough MinHash Jaccard similarity score
@@ -128,7 +129,7 @@ def run_minhash_lsh():
 
     # Compute pairwise LSH similarities for questions within tags
     if (config.LOG_DEBUG): print("[BATCH]: Fetching questions, comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
-    find_dup_cands_within_tags(mh, lsh)
+    find_dup_cands_within_tags()
 
 
 def main():
@@ -153,18 +154,18 @@ def main():
     custom_lsh = CustomMinHashLSH()
 
     # Compute MinHash/LSH hashes for every question
-    if (config.LOG_DEBUG): print("[BATCH]: Calculating MinHash hashes and LSH hashes...")
     df = custom_lsh.compute_minhash_lsh(df)
 
     # save df to Redis and organize by topic
     df.foreachPartition(store_lsh_redis_by_topic)
 
     # Compute pairwise LSH similarities for questions within tags
-    if (config.LOG_DEBUG): print("[BATCH]: Fetching questions, comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
-    #find_dup_cands_within_tags(mh, lsh)
+    if (config.LOG_DEBUG): print("[BATCH]: Fetching questions, \
+            comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
+    find_dup_cands_within_tags()
 
-    candidate_sets = custom_lsh.find_similar_cands(df)
-    print('candiate_sets: {}'.format(candidate_sets))
+    #candidate_sets = custom_lsh.find_similar_cands(df)
+    #print('candiate_sets: {}'.format(candidate_sets))
     #candidate_sets.foreachPartition(lambda rdd: store_dup_cand_redis(rdd))
 
     end_time = time.time()
