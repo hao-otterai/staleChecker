@@ -19,8 +19,22 @@ import util
 
 from MinHash import MinHash
 from LSH import LSH
-from CustomMinHashLSH import CustomMinHashLSH
 
+
+def load_mh_lsh():
+    #  Create and save MinHash and LSH if not exist or load them from file
+    if(not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
+        mh = MinHash(config.MIN_HASH_K_VALUE)
+        lsh = LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
+        print('saving mh, lsh to file {}, {}'.format(config.MIN_HASH_PICKLE, config.LSH_PICKLE))
+        util.save_pickle_file(mh, config.MIN_HASH_PICKLE)
+        util.save_pickle_file(lsh, config.LSH_PICKLE)
+    else:
+        if config.LOG_DEBUG: print('loading mh and lsh from local files')
+        mh = util.load_pickle_file(config.MIN_HASH_PICKLE)
+        lsh = util.load_pickle_file(config.LSH_PICKLE)
+    if config.LOG_DEBUG: print('mh and lsh init finished')
+    return mh, lsh
 
 
 # Computes MinHashes, LSHes for all in DataFrame
@@ -31,42 +45,36 @@ def compute_minhash_lsh(df, mh, lsh):
     df = df.withColumn("min_hash", calc_min_hash("text_body_stemmed"))
     df = df.withColumn("lsh_hash", calc_lsh_hash("min_hash"))
 
-    df.foreachPartition(store_lsh_redis)
+    try:
+        df.foreachPartition(store_lsh_redis_by_topic)
+    except Exception as e:
+        print("ERROR: failed to save minhash lsh by tpic to Redis")
+
+    return df
 
 
 # Store question data
 def store_lsh_redis_by_topic(rdd):
     if config.LOG_DEBUG: print("store minhash and lsh by topic(i.e, company)")
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for q in rdd:
+        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
+                    "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
+        print(q_json)
         for tag in q.tag_company:
-            q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash, "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
             rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
             rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
 
-
 # Store duplicate candidates in Redis
 def store_dup_cand_redis(rdd):
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    # rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for cand in rdd:
         cand_reformatted = (cand.q1_id, cand.q1_headline, cand.q2_id, cand.q2_headline, cand.q1_timestamp, cand.q2_timestamp)
         # Store by time
         rdb.zadd("dup_cand", cand.mh_js, cand_reformatted)
 
 
-# Store LSH similarity data
-def store_spark_mllib_tag_indexed_sim_redis(rdd):
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-    for sim in rdd:
-        if(sim.jaccard_sim > config.DUP_QUESTION_IDENTIFY_THRESHOLD):
-            q_pair = (sim.tag, sim.q1_id, sim.q1_title, sim.q2_id, sim.q2_title)
-            rdb.zadd("spark_mllib_tag_indexed_sim", sim.jaccard_sim, q_pair)
-
-
 # Compares LSH signatures, MinHash signature, and find duplicate candidates
 def find_dup_cands_within_tags():
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-
     # Fetch all tags from lsh_keys set
     for lsh_key in rdb.sscan_iter("lsh_keys", match="*", count=500):
         tag = lsh_key.replace("lsh:", "")
@@ -78,36 +86,134 @@ def find_dup_cands_within_tags():
         if config.LOG_DEBUG: print("{0} news".format(len(tq)))
         tq_df = sql_context.read.json(sc.parallelize(tq))
 
-        ### this is a major performance limiting step which should be optimized
-        find_lsh_sim = udf(lambda x, y: util.common_bands_count(x, y), IntegerType())
-        lsh_sim_df = tq_df.alias("q1").join(tq_df.alias("q2"),
-            [col("q1.timestamp") < col("q2.timestamp"),
-            col("q2.timestamp") - col("q1.timestamp") < config.TIME_WINDOW]).select(
-            col("q1.id").alias("q1_id"),
-            col("q2.id").alias("q2_id"),
-            col("q1.min_hash").alias("q1_min_hash"),
-            col("q2.min_hash").alias("q2_min_hash"),
-            col("q1.headline").alias("q1_headline"),
-            col("q2.headline").alias("q2_headline"),
-            col("q1.timestamp").alias("q1_timestamp"),
-            col("q2.timestamp").alias("q2_timestamp"),
-            find_lsh_sim("q1.lsh_hash", "q2.lsh_hash").alias("lsh_sim")
-        ).sort("q1_timestamp", "q2_timestamp")
+        # find top similar set within a time window
+        _similar_sets_dict = find_similar_cands_lsh(tq_df)
 
-        # Duplicate candidates have a high enough LSH similarity count
-        lsh_cand_df = lsh_sim_df.filter(lsh_sim_df.lsh_sim >= config.LSH_SIMILARITY_BAND_COUNT)
+        print(_similar_sets_dict)
 
-        # Compare MinHash jaccard similarity scores for duplicate candidates
-        find_mh_js = udf(lambda x, y: util.jaccard_sim_score(x, y))
-        mh_cand_df = lsh_cand_df.withColumn("mh_js", find_mh_js(lsh_cand_df.q1_min_hash, lsh_cand_df.q2_min_hash))
+        # find_lsh_sim = udf(lambda x, y: util.common_bands_count(x, y), IntegerType())
+        # lsh_sim_df = tq_df.alias("q1").join(tq_df.alias("q2"),
+        #     [col("q1.timestamp") < col("q2.timestamp"),
+        #     col("q2.timestamp") - col("q1.timestamp") < config.TIME_WINDOW]).select(
+        #     col("q1.id").alias("q1_id"),
+        #     col("q2.id").alias("q2_id"),
+        #     col("q1.min_hash").alias("q1_min_hash"),
+        #     col("q2.min_hash").alias("q2_min_hash"),
+        #     col("q1.headline").alias("q1_headline"),
+        #     col("q2.headline").alias("q2_headline"),
+        #     col("q1.timestamp").alias("q1_timestamp"),
+        #     col("q2.timestamp").alias("q2_timestamp"),
+        #     find_lsh_sim("q1.lsh_hash", "q2.lsh_hash").alias("lsh_sim")
+        # ).sort("q1_timestamp", "q2_timestamp")
+        # # Duplicate candidates have a high enough LSH similarity count
+        # lsh_cand_df = lsh_sim_df.filter(lsh_sim_df.lsh_sim >= config.LSH_SIMILARITY_BAND_COUNT)
+        #
+        # # Compare MinHash jaccard similarity scores for duplicate candidates
+        # find_mh_js = udf(lambda x, y: util.jaccard_sim_score(x, y))
+        # mh_cand_df = lsh_cand_df.withColumn("mh_js", find_mh_js(lsh_cand_df.q1_min_hash, lsh_cand_df.q2_min_hash))
+        #
+        # # Duplicate candidates need to have a high enough MinHash Jaccard similarity score
+        # # dup_cand_df = mh_cand_df.filter(mh_cand_df.mh_js >= config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+        #
+        # print("number of partitions: ", dup_cand_df.rdd.getNumPartitions())
+        # dup_cand_df.foreachPartition(lambda rdd: store_dup_cand_redis(rdd))
 
-        # Duplicate candidates need to have a high enough MinHash Jaccard similarity score
-        dup_cand_df = mh_cand_df.filter(mh_cand_df.mh_js >= config.DUP_QUESTION_MIN_HASH_THRESHOLD)
 
-        print("number of partitions: ", dup_cand_df.rdd.getNumPartitions())
-        dup_cand_df.foreachPartition(lambda rdd: store_dup_cand_redis(rdd))
+def find_similar_cands_lsh(df):
+    # find set of news ids which have at least one common lsh bucket
+    _candidates_with_common_bucket = df.select(col('lsh_hash'), col('id')).rdd.flatMap(
+        lambda x: (((hash, band), [x[1]]) for band, hash in enumerate(x[0]))).reduceByKey(
+        lambda a, b: util._extend(a,b)).map(lambda x: x[1]).filter(lambda x: len(x)>1).distinct()
+    # _candidates_with_common_bucket = df.select(col('id'), col('headline'), col('min_hash'), col('lsh_hash')).rdd.flatMap(
+    #     lambda x: (((hash, band), [(x[0], x[1], x[2])]) for band, hash in enumerate(x[3]))).reduceByKey(
+    #     lambda a, b: _extend(a,b)).map(lambda x: x[1]).filter(lambda x: len(x)>1).distinct()
+
+    rdd_dataset = _candidates_with_common_bucket.map(lambda candiate_sets: get_jaccard_similarity(df, candidate_sets))
+    _similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: lsh.merge_result(acc, val)).collectAsMap()
+    return _similar_sets_dict
 
 
+def get_jaccard_similarity(df, candidate_sets):
+    # Input whole df to calculate similar sets base on candidate_sets
+    # create base set and its similar sets in a dictionary.
+    # return = {base_set:(similar_set:jaccard_similarity, )}
+    _similar_dict = {}
+    if config.LOG_DEBUG: print('get_jaccard_similarity=>candidate_sets=%s'%(str(candidate_sets)))
+
+    # Generate combination for each set in candidate sets.
+    candidate_df = df.filter('id' in candidate_sets).orderBy(df.timestamp.asc()).collect()
+    if config.LOG_DEBUG: print('get_jaccard_similarity=>candidate_df=%s'%(str(candidate_df)))
+
+    for _b_set, _s_set in itertools.permutations(candidate_df,2):
+        _similar_dict[_b_set['id']] = []
+        if _b_set['timestamp'] < _s_set['timestamp'] or _b_set['timestamp'] > (_s_set['timestamp'] + config.TIME_WINDOW):
+            continue
+
+        #calculate jaccard similarity and update redis cache
+        jaccard_sim_token = 'jaccard_sim:{}:{}'.format(_b_set['id'], _s_set['id'])
+        if rdb.hexists(jaccard_sim_token):
+            _jaccard_similarity = rdb.hget(jaccard_sim_token)
+        else:
+            _jaccard_similarity = util.jaccard_sim_score(_b_set['min_hash'], _s_set['min_hash'])
+            rdb.hset(jaccard_sim_token, _jaccard_similarity)
+
+        # Store the result and get top NUM_OF_MOST_SIMILAR_SET similar sets
+        if _jaccard_similarity > config.DUP_QUESTION_MIN_HASH_THRESHOLD:
+            _similar_dict[_b_set['id']].append([_jaccard_similarity, _s_set['id']])
+
+    # filter and select top similar set.
+    _similar_dict = dict( [(k,sorted(v, key=lambda x: (x[0],-int(x[1][1:])), reverse=True)[:config.NUM_OF_MOST_SIMILAR_SET])
+                        for k,v in _similar_dict.items() if len(v)>0])
+
+    if DEBUG: print('get_jaccard_similarity=> _similar_dict=%s'%(_similar_dict))
+    return _similar_dict
+
+
+
+
+def main():
+    spark_conf = SparkConf().setAppName("Spark CustomMinHashLSH").set("spark.cores.max", "30")
+
+    global sc
+    sc = SparkContext(conf=spark_conf)
+    sc.setLogLevel("ERROR")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/MinHash.py")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/LSH.py")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/util.py")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
+    global sql_context
+    sql_context = SQLContext(sc)
+
+    global rdb
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+
+    start_time = time.time()
+    # load historical data
+    df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED)
+
+    mh, lsh = load_mh_lsh()
+    # Compute MinHash/LSH hashes for historical news
+    df = compute_minhash_lsh(df, mh, lsh)
+
+    # Compute pairwise LSH similarities for news within tags
+    if (config.LOG_DEBUG): print("[BATCH]: Fetching questions,comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
+    find_dup_cands_within_tags(rdb)
+
+    #candidate_sets = custom_lsh.find_similar_cands(df)
+    #print('candiate_sets: {}'.format(candidate_sets))
+    #candidate_sets.foreachPartition(lambda rdd: store_dup_cand_redis(rdd))
+
+    end_time = time.time()
+    print("Spark Custom MinHashLSH run time (seconds): {0} seconds".format(end_time - start_time))
+
+
+if(__name__ == "__main__"):
+    main()
+
+
+
+
+"""
 # understanding LSH parameters:
 # https://towardsdatascience.com/understanding-locality-sensitive-hashing-49f6d1f6134
 # https://santhoshhari.github.io/Locality-Sensitive-Hashing/
@@ -134,61 +240,18 @@ def run_minhash_lsh():
     find_dup_cands_within_tags()
 
 
-def main():
-    spark_conf = SparkConf().setAppName("Spark CustomMinHashLSH").set("spark.cores.max", "30")
+def compute_minhash_lsh(mh, lsh, df):
+    # Compute MinHash/LSH hashes for input questions
+    if (config.LOG_DEBUG): print("[BATCH]: Calculating MinHash hashes and LSH hashes...")
+    calc_min_hash = udf(lambda x: list(map(lambda x: int(x), mh.calc_min_hash_signature(x))), ArrayType(IntegerType()))
+    calc_lsh_hash = udf(lambda x: list(map(lambda x: int(x), lsh.find_lsh_buckets(x))), ArrayType(IntegerType()))
 
-    global sc
-    sc = SparkContext(conf=spark_conf)
-    sc.setLogLevel("ERROR")
-    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/MinHash.py")
-    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/LSH.py")
-    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/CustomMinHashLSH.py")
-    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/util.py")
-    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
+    df = df.withColumn("min_hash", calc_min_hash("text_body_stemmed"))
+    df = df.withColumn("lsh_hash", calc_lsh_hash("min_hash"))
 
-    global sql_context
-    sql_context = SQLContext(sc)
-
-    start_time = time.time()
-    #run_minhash_lsh()
-
-    #  Create and save MinHash and LSH if not exist or load them from file
-    if(not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
-        mh = MinHash(config.MIN_HASH_K_VALUE)
-        lsh = LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
-        print('saving mh, lsh to file {}, {}'.format(config.MIN_HASH_PICKLE, config.LSH_PICKLE))
-        util.save_pickle_file(mh, config.MIN_HASH_PICKLE)
-        util.save_pickle_file(lsh, config.LSH_PICKLE)
-    else:
-        if config.LOG_DEBUG: print('loading mh and lsh from local files')
-        mh = util.load_pickle_file(config.MIN_HASH_PICKLE)
-        lsh = util.load_pickle_file(config.LSH_PICKLE)
-    if config.LOG_DEBUG: print('mh and lsh init finished')
-
-    # CustomMinHashLSH object init
-    custom_lsh = CustomMinHashLSH(mh, lsh)
-
-    # load historical data
-    df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED)
-
-    # Compute MinHash/LSH hashes for historical news
-    df = custom_lsh.compute_minhash_lsh(df)
-
-    # save df to Redis and organize by topic
-    df.foreachPartition(store_lsh_redis_by_topic)
-
-    # Compute pairwise LSH similarities for news within tags
-    if (config.LOG_DEBUG): print("[BATCH]: Fetching questions, \
-            comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
-    find_dup_cands_within_tags()
-
-    #candidate_sets = custom_lsh.find_similar_cands(df)
-    #print('candiate_sets: {}'.format(candidate_sets))
-    #candidate_sets.foreachPartition(lambda rdd: store_dup_cand_redis(rdd))
-
-    end_time = time.time()
-    print("Spark Custom MinHashLSH run time (seconds): {0} seconds".format(end_time - start_time))
-
-
-if(__name__ == "__main__"):
-    main()
+    df.foreachPartition(store_lsh_redis)
+    return df
+    # # Compute pairwise LSH similarities for questions within tags
+    # if (config.LOG_DEBUG): print("[BATCH]: Fetching questions, comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
+    # find_dup_cands_within_tags(mh, lsh)
+"""

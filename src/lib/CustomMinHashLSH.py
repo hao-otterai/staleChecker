@@ -44,8 +44,9 @@ class CustomMinHashLSH(object):
         df = df.withColumn("min_hash", calc_min_hash("text_body_stemmed"))
         df = df.withColumn("lsh_hash", calc_lsh_hash("min_hash"))
 
+        df.foreachPartition(store_lsh_redis)
+
         return df
-        # df.foreachPartition(store_lsh_redis)
         #
         # # Compute pairwise LSH similarities for questions within tags
         # if (config.LOG_DEBUG): print("[BATCH]: Fetching questions, comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
