@@ -20,17 +20,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) +
 import config
 import util
 
-
+global sc
+global sql_context
 class CustomMinHashLSH(object):
 
     def __init__(self, ):
-        self.conf = SparkConf.setAppName('customMinHashLSH')
-        self.sc = SparkContext.getOrCreate(conf=self.conf)
-        self.sc.setLogLevel("ERROR")
-        self.sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/util.py")
-        self.sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
-        self.sql_context = SQLContext(sc)
-
+        # conf = SparkConf()
+        # self.sc = SparkContext.getOrCreate(conf=conf)
+        # self.sc.setLogLevel("ERROR")
+        # self.sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/util.py")
+        # self.sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
+        # self.sql_context = SQLContext(sc)
+        
         self.jaccard_similarity = {}
         self.init_mh_lsh()
 
