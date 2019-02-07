@@ -45,14 +45,23 @@ def compute_minhash_lsh(df, mh, lsh):
     df = df.withColumn("min_hash", calc_min_hash("text_body_stemmed"))
     df = df.withColumn("lsh_hash", calc_lsh_hash("min_hash"))
 
-    if config.LOG_DEBUG: print(df.first())
-
+    #if config.LOG_DEBUG: print(df.first())
     df.foreachPartition(store_lsh_redis_by_topic)
     return df
 
+# # Store question data
+# def store_lsh_redis(rdd):
+#     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+#     for q in rdd:
+#         for tag in q.tag_company:
+#             q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
+#                     "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
+#             rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
+#             rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
 
 # Store question data
 def store_lsh_redis_by_topic(rdd):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     if config.LOG_DEBUG: print("store minhash and lsh by topic(i.e, company)")
     for q in rdd:
         q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,

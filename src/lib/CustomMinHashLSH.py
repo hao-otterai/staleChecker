@@ -23,6 +23,18 @@ import util
 global sc
 global sql_context
 
+# Store question data
+def store_lsh_redis_by_topic(rdd):
+    if config.LOG_DEBUG: print("store minhash and lsh by topic(i.e, company)")
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    for q in rdd:
+        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
+                    "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
+        print(q_json)
+        for tag in q.tag_company:
+            rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
+            rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+
 class CustomMinHashLSH(object):
     def __init__(self, mh, lsh):
         # conf = SparkConf()
