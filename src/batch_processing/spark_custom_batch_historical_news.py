@@ -45,6 +45,8 @@ def compute_minhash_lsh(df, mh, lsh):
     df = df.withColumn("min_hash", calc_min_hash("text_body_stemmed"))
     df = df.withColumn("lsh_hash", calc_lsh_hash("min_hash"))
 
+    if config.LOG_DEBUG: print(df.first())
+
     df.foreachPartition(store_lsh_redis_by_topic)
     return df
 
