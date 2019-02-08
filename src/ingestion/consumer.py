@@ -7,11 +7,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/
 import config
 
 
+# consumer is for test purposes only.
 class Consumer(threading.Thread):
     def run(self):
-        consumer = kafka.KafkaConsumer(bootstrap_servers=config.KAFKA_SERVERS,)
-                    # value_deserializer = lambda v : json.loads(v.decode('utf-8')),
-                    # api_version=(0, 10, 1))
+        consumer = kafka.KafkaConsumer(bootstrap_servers=config.KAFKA_SERVERS, api_version=(0, 10))
         consumer.subscribe([config.KAFKA_TOPIC])
 
         if config.LOG_DEBUG:
