@@ -76,7 +76,7 @@ def find_dup_cands_within_tags():
         # Fetch all news. ideally, sort the news by timestamp, and get within a range of timestamps
         tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
         if len(tq) < 2: continue
-        
+
         if config.LOG_DEBUG: print("tag {0}: {1} news".format(tag, len(tq)))
         tq_df = sql_context.read.json(sc.parallelize(tq))
 
@@ -180,9 +180,9 @@ def main():
     sql_context = SQLContext(sc)
 
     start_time = time.time()
-    #df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED) # load historical data
-    #mh, lsh = load_mh_lsh()
-    #compute_minhash_lsh(df, mh, lsh) # Compute MinHash/LSH hashes for historical news
+    df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED) # load historical data
+    mh, lsh = load_mh_lsh()
+    compute_minhash_lsh(df, mh, lsh) # Compute MinHash/LSH hashes for historical news
 
     # Compute pairwise LSH similarities for news within tags
     if (config.LOG_DEBUG): print("[BATCH]: Fetching questions,comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
