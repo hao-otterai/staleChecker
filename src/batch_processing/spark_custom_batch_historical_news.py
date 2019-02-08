@@ -219,11 +219,10 @@ def get_jaccard_similarity(candidate_set):
 
         #calculate jaccard similarity and update redis cache
         jaccard_sim_token = 'jaccard_sim:{}:{}'.format(_b_set[0], _s_set[0])
-        if rdb.hexists(jaccard_sim_token):
-            _jaccard_similarity = rdb.hget(jaccard_sim_token)
-        else:
+        _jaccard_similarity = rdb.get(jaccard_sim_token)
+        if _jaccard_similarity is None
             _jaccard_similarity = util.jaccard_sim_score(_b_set[1], _s_set[1])
-            rdb.hset(jaccard_sim_token, _jaccard_similarity)
+            rdb.set(jaccard_sim_token, _jaccard_similarity)
 
         # Store the result and get top NUM_OF_MOST_SIMILAR_SET similar sets
         if _jaccard_similarity > config.DUP_QUESTION_MIN_HASH_THRESHOLD:
