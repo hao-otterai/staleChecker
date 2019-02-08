@@ -14,7 +14,7 @@ import config
 
 global sql_context
 
-def _extend(a,b): # both a, b are list
+def custom_extend(a,b): # both a, b are list
     a.extend(b)
     return a
 
