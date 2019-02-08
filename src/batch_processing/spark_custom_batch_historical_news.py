@@ -195,9 +195,9 @@ def find_similar_cands_lsh(df):
             if config.LOG_DEBUG > 1: print('LSH.get_merge_result=> _final_dict=%s'%(_final_dict))
         return acc_list
 
-    rdd_similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: _merge_result(acc, val)).collectAsMap()
-    if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_similar_sets_dict.collect()))
-    return rdd_similar_sets_dict
+    similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: _merge_result(acc, val)).collectAsMap()
+    if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_sets_dict))
+    return similar_sets_dict
 
 
 def get_jaccard_similarity(candidate_set):
