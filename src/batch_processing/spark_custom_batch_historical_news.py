@@ -2,14 +2,14 @@ import sys
 import os
 import time
 import json
+import itertools
+import redis
 
 from pyspark.conf import SparkConf
 from pyspark.context import SparkContext
 from pyspark.sql import SQLContext
 from pyspark.sql.functions import udf, col
 from pyspark.sql.types import IntegerType, ArrayType, StringType, Row
-
-import redis
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib")
