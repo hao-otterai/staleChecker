@@ -181,10 +181,10 @@ def find_similar_cands_lsh(df):
     rdd_cands_with_common_bucket = df.select(col('id'), col('min_hash'), col('headline'), col('timestamp'), col('lsh_hash')).rdd.flatMap(
         lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])]) for band, hash in enumerate(x[4]))).reduceByKey(
         lambda a, b: util.custom_extend(a,b)).filter(lambda x: len(x[1])>1).map(lambda x: tuple(x[1]))
-    if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_cands_with_common_bucket.collect()))
+    #if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_cands_with_common_bucket.collect()))
 
     rdd_dataset = rdd_cands_with_common_bucket.map(lambda candidate_set: get_jaccard_similarity(candidate_set))
-    if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_dataset.first()))
+    #if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_dataset.first()))
 
     def _merge_result(acc_list, value_list):
         # Remove redundant similar sets from each partitions
@@ -195,7 +195,7 @@ def find_similar_cands_lsh(df):
             if config.LOG_DEBUG > 1: print('LSH.get_merge_result=> _final_dict=%s'%(_final_dict))
         return acc_list
 
-    similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items())
+    rdd_similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: _merge_result(acc, val))
     # similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: _merge_result(acc, val)).collectAsMap()
     if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_sets_dict.collect()))
     return similar_sets_dict
