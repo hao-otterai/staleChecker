@@ -84,10 +84,8 @@ def find_dup_cands_within_tags():
 
         # Fetch all news. ideally, sort the news by timestamp, and get within a range of timestamps
         tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
-
-        if config.LOG_DEBUG: print("{0} news".format(len(tq)))
         if len(tq) < 2: continue
-
+        if config.LOG_DEBUG: print("{0} news".format(len(tq)))
         tq_df = sql_context.read.json(sc.parallelize(tq))
 
         # find top similar set within a time window
@@ -182,7 +180,7 @@ def find_similar_cands_lsh(df):
     if config.LOG_DEBUG: df.printSchema()
     rdd_cands_with_common_bucket = df.select(col('id'), col('min_hash'), col('headline'), col('timestamp'), col('lsh_hash')).rdd.flatMap(
         lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])]) for band, hash in enumerate(x[4]))).reduceByKey(
-        lambda a, b: util.custom_extend(a,b)).map(lambda x: x[1]).filter(lambda x: len(x)>1).distinct()
+        lambda a, b: util.custom_extend(a,b)).map(lambda x: tuple(x[1])).filter(lambda x: len(x)>1).distinct()
     if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_cands_with_common_bucket.collect()))
 
     rdd_dataset = rdd_cands_with_common_bucket.map(lambda candiate_set: get_jaccard_similarity(candidate_set))
