@@ -10,10 +10,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/
 import config
 import util
 
+import json
+
 class Producer(threading.Thread):
     def run(self):
         producer = kafka.KafkaProducer(bootstrap_servers=['localhost:9092'],
-                                        api_version=(0, 10, 1)) #"ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092"
+                                        value_serializer=lambda v: json.dumps(v).encode('utf-8')
+                                        api_version=(0, 10, 1))
 
         line = "hello kafka!"
         for i in range(1000):
