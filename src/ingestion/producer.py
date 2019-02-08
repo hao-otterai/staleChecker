@@ -27,6 +27,7 @@ class Producer(threading.Thread):
 def main():
     producer = Producer()
     producer.start()
+    print('servers')
     print("Starting Kafka Producer: Ingesting at {0} events per second...".format(1.0 / (config.KAFKA_PRODUCER_RATE)))
 
 

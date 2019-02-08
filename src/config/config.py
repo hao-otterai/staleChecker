@@ -1,6 +1,3 @@
-
-''' IMPORTANT: RENAME THIS FILE TO CONFIG.PY TO RUN '''
-
 import os
 
 # Program settings
@@ -18,9 +15,10 @@ S3_BUCKET_BATCH_RAW = "my-bucket-dowjones-raw"
 S3_BUCKET_STREAM = "my-bucket-dowjones-stream"
 
 # Kafka settings
+# ip:port for kafka brokers
 KAFKA_SERVERS = ["ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092",
                 "ec2-35-161-10-145.us-west-2.compute.amazonaws.com:9092",
-                "ec2-34-210-190-100.us-west-2.compute.amazonaws.com:9092"]  # ip:port for kafka brokers
+                "ec2-34-210-190-100.us-west-2.compute.amazonaws.com:9092"]
 
 KAFKA_PRODUCER_RATE = 0.05  # seconds
 KAFKA_TOPIC = "dowjones"

@@ -6,7 +6,6 @@ import time
 import pickle
 
 from functools import reduce
-from pyspark.sql import DataFrame
 from pyspark.ml.feature import HashingTF, IDF
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
@@ -41,8 +40,8 @@ def get_bucket(bucket_name):
             return s3.Bucket(bucket_name)
 
 # Unions dataframes with same schema
-def union_dfs(*dfs):
-    return reduce(DataFrame.unionAll, dfs)
+# def union_dfs(*dfs):
+#     return reduce(DataFrame.unionAll, dfs)
 
 # Decorator for timing processess
 def time_process(func, process_name):
