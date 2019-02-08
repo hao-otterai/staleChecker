@@ -226,7 +226,7 @@ def get_jaccard_similarity(candidate_set):
 
         # Store the result and get top NUM_OF_MOST_SIMILAR_SET similar sets
         if _jaccard_similarity > config.DUP_QUESTION_MIN_HASH_THRESHOLD:
-            _similar_dict[_b_set[0]].append([_jaccard_similarity, (_s_set[0],_s_set[2],_s_set[3]) ])
+            _similar_dict[(_b_set[0],_b_set[2],_b_set[3])].append([_jaccard_similarity, (_s_set[0],_s_set[2],_s_set[3]) ])
 
     # filter and select top similar set.
     _similar_dict = dict( [(k,sorted(v, key=lambda x: (x[0],-x[1][2]), reverse=True)[:config.NUM_OF_MOST_SIMILAR_SET])
