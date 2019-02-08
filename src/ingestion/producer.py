@@ -26,11 +26,11 @@ class Producer(threading.Thread):
         #             # time.sleep(config.KAFKA_PRODUCER_RATE)
         #             producer.send(config.KAFKA_TOPIC, line)
         i = 0
-        while True:
+        while i<1000:
             line = "hello world {}".format(i)
             if config.LOG_DEBUG: print(line)
             producer.send(config.KAFKA_TOPIC, line)
-            time.sleep(0.5)
+            time.sleep(0.1)
             i += 1
 
 def main():
