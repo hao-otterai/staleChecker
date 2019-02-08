@@ -231,7 +231,7 @@ def get_jaccard_similarity(candidate_set):
     # filter and select top similar set.
     _similar_dict = dict( [(k,sorted(v, key=lambda x: (x[0],-x[1][2]), reverse=True)[:config.NUM_OF_MOST_SIMILAR_SET])
                         for k,v in _similar_dict.items() if len(v)>0])
-    if DEBUG: print('get_jaccard_similarity=> _similar_dict=%s'%(_similar_dict))
+    if config.LOG_DEBUG: print('get_jaccard_similarity=> _similar_dict=%s'%(_similar_dict))
 
     end_time = time.time()
     print("get_jaccard_similarity run time (seconds): {0} seconds".format(end_time - start_time))
