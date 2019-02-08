@@ -183,7 +183,7 @@ def find_similar_cands_lsh(df):
         lambda a, b: util.custom_extend(a,b)).filter(lambda x: len(x[1])>1).map(lambda x: tuple(x[1]))
     if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_cands_with_common_bucket.collect()))
 
-    rdd_dataset = rdd_cands_with_common_bucket.map(lambda candiate_set: get_jaccard_similarity(candidate_set))
+    rdd_dataset = rdd_cands_with_common_bucket.map(lambda candidate_set: get_jaccard_similarity(candidate_set))
     if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_dataset.first()))
 
     def _merge_result(acc_list, value_list):
