@@ -12,7 +12,9 @@ import util
 
 class Producer(threading.Thread):
     def run(self):
-        producer = kafka.KafkaProducer(bootstrap_servers=config.KAFKA_SERVERS)
+        producer = kafka.KafkaProducer(bootstrap_servers=config.KAFKA_SERVERS,
+                                        value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+                                        api_version=(0, 10, 1))
 
         bucket = util.get_bucket(config.S3_BUCKET_STREAM)
 

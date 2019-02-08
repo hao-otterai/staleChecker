@@ -15,7 +15,7 @@ import json
 class Producer(threading.Thread):
     def run(self):
         producer = kafka.KafkaProducer(bootstrap_servers=['localhost:9092'],
-                                        value_serializer=lambda v: json.dumps(v).encode('utf-8')
+                                        value_serializer=lambda v: json.dumps(v).encode('utf-8'),
                                         api_version=(0, 10, 1))
 
         line = "hello kafka!"

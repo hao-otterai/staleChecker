@@ -9,7 +9,8 @@ import config
 
 class Consumer(threading.Thread):
     def run(self):
-        consumer = kafka.KafkaConsumer(bootstrap_servers=config.KAFKA_SERVERS)
+        consumer = kafka.KafkaConsumer(bootstrap_servers=config.KAFKA_SERVERS,
+                                        api_version=(0, 10, 1))
         consumer.subscribe([config.KAFKA_TOPIC])
 
         if config.LOG_DEBUG:
