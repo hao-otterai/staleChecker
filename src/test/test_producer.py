@@ -12,7 +12,8 @@ import util
 
 class Producer(threading.Thread):
     def run(self):
-        producer = kafka.KafkaProducer(bootstrap_servers=['localhost:9092']) #"ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092"
+        producer = kafka.KafkaProducer(bootstrap_servers=['localhost:9092'],
+                                        api_version=(0, 10, 1)) #"ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092"
 
         line = "hello kafka!"
         for i in range(1000):
