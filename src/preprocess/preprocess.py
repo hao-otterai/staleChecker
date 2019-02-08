@@ -3,20 +3,17 @@ import os
 import re
 import time
 
-from pyspark.ml.feature import StopWordsRemover, Tokenizer
-from pyspark.ml.feature import HashingTF, IDF, VectorAssembler
-
-from pyspark.sql.types import ArrayType, StringType
-from pyspark.sql.functions import udf, concat, col, lit
-
 from pyspark.conf import SparkConf
 from pyspark.context import SparkContext
 from pyspark.sql import SQLContext
+from pyspark.sql.types import ArrayType, StringType
+from pyspark.sql.functions import udf, concat, col, lit, unix_timestamp
 
-#import com.databricks.spark.xml
+from pyspark.ml.feature import StopWordsRemover, Tokenizer
+from pyspark.ml.feature import HashingTF, IDF, VectorAssembler
 
 import nltk
-nltk.download("wordnet")
+nltk.download("wordnet") # only need to download once
 from nltk.stem import WordNetLemmatizer
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
@@ -24,16 +21,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/
 import config
 import util
 
-from pyspark.sql.functions import unix_timestamp
 
-
-
-# Stems words
-def lemmatize(tokens):
-    wordnet_lemmatizer = WordNetLemmatizer()
-    stems = [wordnet_lemmatizer.lemmatize(token) for token in tokens if len(token) > 1]
-    return tuple(stems)
-
+#import com.databricks.spark.xml
+# os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages com.databricks.spark.xml pyspark-shell"
 
 # Removes code snippets and other irregular sections from question body, returns cleaned string
 def filter_body(body):
@@ -42,6 +32,13 @@ def filter_body(body):
     remove_numerical = re.sub(r"[-?0-9]+", " ", remove_punctuation)
     remove_spaces = remove_numerical.replace("\n", " ")
     return remove_spaces.encode('ascii', 'ignore')
+
+
+# Stems words
+def lemmatize(tokens):
+    wordnet_lemmatizer = WordNetLemmatizer()
+    stems = [wordnet_lemmatizer.lemmatize(token) for token in tokens if len(token) > 1]
+    return tuple(stems)
 
 
 # Create 2 gram shingles from text body
@@ -62,15 +59,7 @@ def preprocess_file(bucket_name, file_name):
     tag_industry, tag_market, source, hot, display_date, display_timestamp, djn_urgency"
 
     raw_data = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
-    # raw_data = sc.textFile("s3a://{0}/{1}".format(bucket_name, file_name))
-    # header = raw_data.first()
-    # raw_data = raw_data.filter(lambda line: line != header)
-    # #raw_data.take(10)
-    # raw_data = raw_data.map(lambda k: k.split(",")).toDF(header.split(","))
-    #raw_data.show()
-    if (config.LOG_DEBUG):
-        print('Schema of raw input data')
-        raw_data.printSchema()
+    if (config.LOG_DEBUG): raw_data.printSchema()
 
     # Clean question body
     if(config.LOG_DEBUG): print("[PROCESSING]: Cleaning headline and body...")
