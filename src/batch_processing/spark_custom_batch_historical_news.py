@@ -76,7 +76,8 @@ def find_dup_cands_within_tags():
         # Fetch all news. ideally, sort the news by timestamp, and get within a range of timestamps
         tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
         if len(tq) < 2: continue
-        #if config.LOG_DEBUG: print("{0} news".format(len(tq)))
+        
+        if config.LOG_DEBUG: print("tag {0}: {1} news".format(tag, len(tq)))
         tq_df = sql_context.read.json(sc.parallelize(tq))
 
         # find top similar set within a time window
