@@ -184,14 +184,25 @@ def find_similar_cands_lsh(df):
         lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])]) for band, hash in enumerate(x[4]))).reduceByKey(
         lambda a, b: _extend(a,b)).map(lambda x: x[1]).filter(lambda x: len(x)>1).distinct()
     if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_cands_with_common_bucket.collect()))
-    break
-    
-    rdd_dataset = rdd_cands_with_common_bucket.map(lambda candiate_set: get_jaccard_similarity(candidate_set))
-    if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_dataset.first()))
 
-    similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: lsh.merge_result(acc, val)).collectAsMap()
-    if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_sets_dict.first()))
+    rdd_dataset = rdd_cands_with_common_bucket.map(lambda candiate_set: get_jaccard_similarity(candidate_set))
+    if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_dataset.collect()))
+
+
+    def _merge_result(acc_list, value_list):
+        # Remove redundant similar sets from each partitions
+        for _v in value_list:
+            if _v not in acc_list:
+                acc_list.append(_v)
+            else: pass
+            if config.LOG_DEBUG > 1: print('LSH.get_merge_result=> _final_dict=%s'%(_final_dict))
+        return acc_list
+
+    similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items())
+    # similar_sets_dict = rdd_dataset.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: _merge_result(acc, val)).collectAsMap()
+    if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_sets_dict.collect()))
     return similar_sets_dict
+
 
 def get_jaccard_similarity(candidate_set):
     """
@@ -205,27 +216,27 @@ def get_jaccard_similarity(candidate_set):
     if config.LOG_DEBUG: print('get_jaccard_similarity=>candidate_set=%s'%(str(candidate_set)))
 
     for _b_set, _s_set in itertools.permutations(candidate_set,2):
-        _similar_dict[_b_set['id']] = []
-        if _b_set['timestamp'] < _s_set['timestamp'] or _b_set['timestamp'] > (_s_set['timestamp'] + config.TIME_WINDOW):
+        _similar_dict[(_b_set[0],_b_set[2],_b_set[3])] = []
+        if _b_set[3] < _s_set[3] or _b_set[3] > (_s_set[3] + config.TIME_WINDOW):
             continue
 
         #calculate jaccard similarity and update redis cache
-        jaccard_sim_token = 'jaccard_sim:{}:{}'.format(_b_set['id'], _s_set['id'])
+        jaccard_sim_token = 'jaccard_sim:{}:{}'.format(_b_set[0], _s_set[0])
         if rdb.hexists(jaccard_sim_token):
             _jaccard_similarity = rdb.hget(jaccard_sim_token)
         else:
-            _jaccard_similarity = util.jaccard_sim_score(_b_set['min_hash'], _s_set['min_hash'])
+            _jaccard_similarity = util.jaccard_sim_score(_b_set[1], _s_set[1])
             rdb.hset(jaccard_sim_token, _jaccard_similarity)
 
         # Store the result and get top NUM_OF_MOST_SIMILAR_SET similar sets
         if _jaccard_similarity > config.DUP_QUESTION_MIN_HASH_THRESHOLD:
-            _similar_dict[_b_set['id']].append([_jaccard_similarity, _s_set['id']])
+            _similar_dict[_b_set[0]].append([_jaccard_similarity, (_s_set[0],_s_set[2],_s_set[3]) ])
 
     # filter and select top similar set.
-    _similar_dict = dict( [(k,sorted(v, key=lambda x: (x[0],-int(x[1][1:])), reverse=True)[:config.NUM_OF_MOST_SIMILAR_SET])
+    _similar_dict = dict( [(k,sorted(v, key=lambda x: (x[0],-x[1][2]), reverse=True)[:config.NUM_OF_MOST_SIMILAR_SET])
                         for k,v in _similar_dict.items() if len(v)>0])
-
     if DEBUG: print('get_jaccard_similarity=> _similar_dict=%s'%(_similar_dict))
+
     end_time = time.time()
     print("get_jaccard_similarity run time (seconds): {0} seconds".format(end_time - start_time))
     return _similar_dict
