@@ -1,6 +1,6 @@
 import os
 import sys
-import smart_open
+#import smart_open
 import kafka
 import time
 import threading
@@ -17,6 +17,11 @@ class Producer(threading.Thread):
                      value_serializer=lambda v: json.dumps(v).encode('utf-8'),
                     api_version=(0, 10))
 
+        with open('2001_sample_10M_stream.json') as f: json_file = json.load(f)
+        for line in json_file:
+            if config.LOG_DEBUG: print(line)
+            producer.send(config.KAFKA_TOPIC, line)
+
         # bucket = util.get_bucket(config.S3_BUCKET_STREAM)
         # for json_obj in bucket.objects.all():
         #     json_file = "s3://{0}/{1}".format(config.S3_BUCKET_STREAM, json_obj.key)
@@ -25,18 +30,12 @@ class Producer(threading.Thread):
         #             if config.LOG_DEBUG: print(line)
         #             # time.sleep(config.KAFKA_PRODUCER_RATE)
         #             producer.send(config.KAFKA_TOPIC, line)
-        i = 0
-        while i<1000:
-            line = "hello world {}".format(i)
-            if config.LOG_DEBUG: print(line)
-            producer.send(config.KAFKA_TOPIC, line)
-            time.sleep(0.1)
-            i += 1
 
 def main():
     producer = Producer()
     producer.start()
-    print("Starting Kafka Producer: Ingesting at {0} events per second...".format(1.0 / (config.KAFKA_PRODUCER_RATE)))
+    print("Starting Kafka Producer...")
+    #print("Starting Kafka Producer: Ingesting at {0} events per second...".format(1.0 / (config.KAFKA_PRODUCER_RATE)))
 
 
 if __name__ == "__main__":
