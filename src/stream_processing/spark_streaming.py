@@ -143,7 +143,8 @@ def main():
     ssc = StreamingContext(sc, config.SPARK_STREAMING_MINI_BATCH_WINDOW)
     ssc.checkpoint("_spark_streaming_checkpoint")
 
-    kafka_stream = KafkaUtils.createDirectStream( ssc, [config.KAFKA_TOPIC], {"metadata.broker.list": config.KAFKA_SERVERS} )
+    kafka_stream = KafkaUtils.createDirectStream( ssc, [config.KAFKA_TOPIC],
+            {"metadata.broker.list": "ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092"} )
 
     # Create and save MinHash and LSH or load them from file
     if (not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
