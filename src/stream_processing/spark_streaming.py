@@ -163,8 +163,8 @@ def main():
     #     .foreachRDD(lambda rdd: rdd.foreachPartition(lambda entry: process_news(entry, mh, lsh)))
 
     def _print_kafka_response(kafka_response):
-        print(kafka_response)
-        print(kafka_response[1])
+        res = kafka_response.collect()
+        print(res)
 
     kafka_stream.map(lambda kafka_response: _print_kafka_response(kafka_response))
 
