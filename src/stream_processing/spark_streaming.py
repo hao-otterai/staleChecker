@@ -10,8 +10,7 @@ from pyspark.conf import SparkConf
 from pyspark.streaming import StreamingContext
 from pyspark.streaming.kafka import KafkaUtils
 
-# os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages org.apache.spark:spark-streaming-kafka-0-8_2.11:2.2.0 pyspark-shell"
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages org.apache.spark:spark-streaming-kafka-0-10_2.11:2.2.0 pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages org.apache.spark:spark-streaming-kafka-0-8_2.11:2.2.0 pyspark-shell"
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib")
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/preprocess")
@@ -164,7 +163,8 @@ def main():
 
     def _print_kafka_response(kafka_response):
         print(kafka_response)
-        
+        print(kafka_response[1])
+
     kafka_stream.map(lambda kafka_response: _print_kafka_response(kafka_response))
 
     ssc.start()
