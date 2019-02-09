@@ -17,7 +17,8 @@ class Producer(threading.Thread):
                      value_serializer=lambda v: json.dumps(v).encode('utf-8'),
                     api_version=(0, 10))
 
-        with open('2001_sample_10M_stream.json') as f: json_file = json.load(f)
+        with open('/home/ubuntu/staleChecker/src/ingestion/2001_sample_10M_stream.json') as f:
+            json_file = json.load(f)
         for line in json_file:
             if config.LOG_DEBUG: print(line)
             producer.send(config.KAFKA_TOPIC, line)
