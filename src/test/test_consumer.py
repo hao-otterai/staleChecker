@@ -7,10 +7,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/
 import config
 
 
+# consumer is for test purposes only.
 class Consumer(threading.Thread):
     def run(self):
-        consumer = kafka.KafkaConsumer(bootstrap_servers=['localhost:9092'],
-                                        api_version=(0, 10, 1))
+        consumer = kafka.KafkaConsumer(bootstrap_servers=config.KAFKA_SERVERS, api_version=(0, 10))
         consumer.subscribe([config.KAFKA_TOPIC])
 
         if config.LOG_DEBUG:
@@ -27,7 +27,7 @@ def main():
             consumer.start()
         else:
             print("Listening for topic: {0}...".format(config.KAFKA_TOPIC))
-            time.sleep(0.1)
+            time.sleep(config.KAFKA_CONSUMER_REFRESH)
 
 
 if __name__ == "__main__":
