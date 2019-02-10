@@ -33,7 +33,8 @@ def main():
     #ssc.checkpoint("_spark_streaming_checkpoint")
 
     kafka_stream = KafkaUtils.createDirectStream( ssc, [config.KAFKA_TOPIC],
-            {"metadata.broker.list": "ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092"} )
+            {"metadata.broker.list": config.KAFKA_SERVERS} )
+            # {"metadata.broker.list": "ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092"} )
 
     # Process stream
     parsed = kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))

@@ -13,7 +13,7 @@ import util
 
 class Producer(threading.Thread):
     def run(self):
-        producer = kafka.KafkaProducer(bootstrap_servers=["ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092"],
+        producer = kafka.KafkaProducer(bootstrap_servers=config.KAFKA_SERVERS,
                      value_serializer=lambda v: json.dumps(v).encode('utf-8'),
                     api_version=(0, 10))
 
