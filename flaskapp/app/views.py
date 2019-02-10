@@ -3,6 +3,7 @@ from flask import render_template, redirect
 import datetime
 import redis
 import math
+from collections import Counter
 
 import sys
 import os
@@ -12,9 +13,8 @@ import config
 rdb = redis.StrictRedis(host=config.REDIS_SERVER, port=6379, db=0)
 
 
+
 ''' Utility functions '''
-
-
 def calc_likelihood(sim_score):
     likelihoods = [("Low", "btn-default"), ("Medium", "btn-warning"), ("High", "btn-danger")]
     print(sim_score)
@@ -49,36 +49,47 @@ def format_dup_cand(dc):
 
 ''' Routes '''
 
+# for test purpose only
+@app.route("/hello")
+def hello():
+    return "Hello from flask!"
 
-@app.route("/")
-@app.route("/candidates")
-def candidates():
-    all_cands = rdb.zrevrangebyscore("dup_cand", "+inf", config.DUP_QUESTION_SHOW_THRESHOLD, withscores=True)
-    dup_cands = [format_dup_cand(dc) for dc in all_cands]
-    return render_template("q_list.html", dup_cands=dup_cands)
-
-
-@app.route("/about")
-def about():
-    return render_template("about.html")
-
-
-@app.route("/visualization")
-def visualization():
-    return render_template("q_cluster_visualization.html")
-
-
-@app.route("/metrics")
-def metrics():
-    return render_template("metrics.html")
-
+@app.route('/countme/<input_str>')
+def count_me(input_str):
+    input_counter = Counter(input_str)
+    response = []
+    for letter, count in input_counter.most_common():
+        response.append('"{}": {}'.format(letter, count))
+    return '<br>'.join(response)
 
 @app.route('/github')
 def github():
-    return redirect("https://github.com/kellielu/askedagain")
+    return redirect("https://github.com/haoyang09/staleChecker.git")
 
 
-@app.route('/slides')
-def slides():
-    return redirect("https://bit.ly/2I5yGPT")
-
+# @app.route("/")
+# @app.route("/candidates")
+# def candidates():
+#     all_cands = rdb.zrevrangebyscore("dup_cand", "+inf", config.DUP_QUESTION_SHOW_THRESHOLD, withscores=True)
+#     dup_cands = [format_dup_cand(dc) for dc in all_cands]
+#     return render_template("q_list.html", dup_cands=dup_cands)
+#
+#
+# # @app.route("/about")
+# # def about():
+# #     return render_template("about.html")
+# #
+# #
+# # @app.route("/visualization")
+# # def visualization():
+# #     return render_template("q_cluster_visualization.html")
+# #
+# #
+# # @app.route("/metrics")
+# # def metrics():
+# #     return render_template("metrics.html")
+#
+#
+# @app.route('/slides')
+# def slides():
+#     return redirect("https://bit.ly/2I5yGPT")
