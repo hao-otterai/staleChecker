@@ -158,15 +158,15 @@ def main():
         lsh = util.load_pickle_file(config.LSH_PICKLE)
 
     # Process stream
-    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))\
-    #     .map(lambda json_body: extract_data(json_body))\
-    #     .foreachRDD(lambda rdd: rdd.foreachPartition(lambda entry: process_news(entry, mh, lsh)))
+    kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))\
+        .map(lambda json_body: extract_data(json_body))\
+        .foreachRDD(lambda rdd: rdd.foreachPartition(lambda entry: process_news(entry, mh, lsh)))
 
-    def _print_kafka_response(kafka_response):
-        res = kafka_response.collect()
-        print(res)
-
-    kafka_stream.map(lambda kafka_response: _print_kafka_response(kafka_response))
+    # def _print_rdd(rdd): print(rdd.collect())
+    #
+    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
+    #     lambda json_body: extract_data(json_body)).foreachRDD(
+    #     lambda rdd: rdd.foreachPartition(lambda entry: process_news(entry, mh, lsh)))
 
     ssc.start()
     ssc.awaitTermination()
