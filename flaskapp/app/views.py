@@ -7,46 +7,10 @@ from collections import Counter
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) + "/src/config")
-import config
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) + "/src/config")
+# import config
 
 rdb = redis.StrictRedis(host=config.REDIS_SERVER, port=6379, db=0)
-
-
-''' Utility functions '''
-def calc_likelihood(sim_score):
-    likelihoods = [("Low", "btn-default"), ("Medium", "btn-warning"), ("High", "btn-danger")]
-    print(sim_score)
-    partition = config.DUP_QUESTION_IDENTIFY_THRESHOLD / (len(likelihoods) - 1)
-    print(partition)
-    print(int(math.floor(sim_score // partition)))
-    return likelihoods[min(len(likelihoods) - 1, int(math.floor(sim_score // partition)))]
-
-
-def so_link(qid):
-    return "http://stackoverflow.com/q/{0}".format(qid)
-
-
-def format_dup_cand(dc):
-    dc_info = eval(dc[0])
-    dc_sim = dc[1]
-    llh_rating, llh_button = calc_likelihood(dc_sim)
-    return {
-        # "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"),
-        "tag": dc_info[0].capitalize(),
-        "q1_id": dc_info[1],
-        "q1_title": dc_info[2],
-        "q2_id": dc_info[3],
-        "q2_title": dc_info[4],
-        "q1_link": so_link(dc_info[1]),
-        "q2_link": so_link(dc_info[3]),
-        "likelihood_button": llh_button,
-        "likelihood_rating": llh_rating,
-        "timestamp": dc_info[5]
-    }
-
-
-''' Routes '''
 
 @app.route('/')
 @app.route('/index')
@@ -63,11 +27,41 @@ def count_me(input_str):
     return '<br>'.join(response)
 
 
-@app.route('/github')
-def github():
-    return redirect("https://github.com/haoyang09/staleChecker.git")
+
+# ''' Utility functions '''
+# def calc_likelihood(sim_score):
+#     likelihoods = [("Low", "btn-default"), ("Medium", "btn-warning"), ("High", "btn-danger")]
+#     print(sim_score)
+#     partition = config.DUP_QUESTION_IDENTIFY_THRESHOLD / (len(likelihoods) - 1)
+#     print(partition)
+#     print(int(math.floor(sim_score // partition)))
+#     return likelihoods[min(len(likelihoods) - 1, int(math.floor(sim_score // partition)))]
+#
+#
+# def so_link(qid):
+#     return "http://stackoverflow.com/q/{0}".format(qid)
+#
+#
+# def format_dup_cand(dc):
+#     dc_info = eval(dc[0])
+#     dc_sim = dc[1]
+#     llh_rating, llh_button = calc_likelihood(dc_sim)
+#     return {
+#         # "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"),
+#         "tag": dc_info[0].capitalize(),
+#         "q1_id": dc_info[1],
+#         "q1_title": dc_info[2],
+#         "q2_id": dc_info[3],
+#         "q2_title": dc_info[4],
+#         "q1_link": so_link(dc_info[1]),
+#         "q2_link": so_link(dc_info[3]),
+#         "likelihood_button": llh_button,
+#         "likelihood_rating": llh_rating,
+#         "timestamp": dc_info[5]
+#     }
 
 
+# ''' Routes '''
 # @app.route("/")
 # @app.route("/candidates")
 # def candidates():
@@ -94,3 +88,8 @@ def github():
 # @app.route('/slides')
 # def slides():
 #     return redirect("https://bit.ly/2I5yGPT")
+#
+# @app.route('/github')
+# def github():
+#     return redirect("https://github.com/haoyang09/staleChecker.git")
+#
