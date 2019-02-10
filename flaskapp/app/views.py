@@ -1,4 +1,4 @@
-from app import app
+from flaskapp.app import app
 from flask import render_template, redirect
 import datetime
 import redis
@@ -11,7 +11,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 import config
 
 
-print(config.REDIS_SERVER)
 rdb = redis.StrictRedis(host=config.REDIS_SERVER, port=6379, db=0)
 
 @app.route('/')
