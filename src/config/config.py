@@ -26,7 +26,7 @@ KAFKA_CONSUMER_REFRESH = 0.2  # seconds
 
 
 # Spark settings - streaming, batch
-SPARK_STREAMING_MINI_BATCH_WINDOW = 0.1  # seconds
+SPARK_STREAMING_MINI_BATCH_WINDOW = 0.2  # seconds
 
 
 # Redis settings
