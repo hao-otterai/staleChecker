@@ -42,7 +42,7 @@ def main():
     parsed = kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))
 
     # count this batch
-    count_this_batch = kafkaStream.count().map(lambda x:('News this batch: %s' % x)).pprint()
+    count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).pprint()
 
     ssc.start()
     ssc.awaitTermination()
