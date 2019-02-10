@@ -12,9 +12,7 @@ from pyspark.streaming.kafka import KafkaUtils
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages org.apache.spark:spark-streaming-kafka-0-8_2.11:2.2.0 pyspark-shell"
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib")
 import config
-import util
 
 
 # Converts incoming news, Adds timestamp to incoming question
@@ -28,7 +26,6 @@ def main():
     spark_conf = SparkConf().setAppName("Spark Streaming Test")
     global sc
     sc = SparkContext(conf=spark_conf)
-    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/util.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
 
     global ssc
@@ -42,7 +39,9 @@ def main():
     parsed = kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))
 
     # count this batch
-    count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).pprint()
+    #count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).pprint()
+    count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).collect()
+    print(count_this_batch)
 
     ssc.start()
     ssc.awaitTermination()
