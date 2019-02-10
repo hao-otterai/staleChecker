@@ -7,11 +7,12 @@ from collections import Counter
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) + "/src/config")
-import config
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) + "/src/config")
+# import config
 
+REDIS_SERVER = "ec2-54-189-255-59.us-west-2.compute.amazonaws.com"
 
-rdb = redis.StrictRedis(host=config.REDIS_SERVER, port=6379, db=0)
+rdb = redis.StrictRedis(host=REDIS_SERVER, port=6379, db=0)
 
 @app.route('/')
 @app.route('/index')
