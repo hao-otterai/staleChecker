@@ -33,16 +33,15 @@ def main():
     #ssc.checkpoint("_spark_streaming_checkpoint")
 
     kafka_stream = KafkaUtils.createDirectStream( ssc, [config.KAFKA_TOPIC],
-            {"metadata.broker.list": config.KAFKA_SERVERS} )
-            # {"metadata.broker.list": "ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092"} )
+            {"metadata.broker.list": str(config.KAFKA_SERVERS)} )
 
     # Process stream
     parsed = kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))
 
     # count this batch
-    #count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).pprint()
-    count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).collect()
-    print(count_this_batch)
+    count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).pprint()
+    #count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).collect()
+    #print(count_this_batch)
 
     ssc.start()
     ssc.awaitTermination()
