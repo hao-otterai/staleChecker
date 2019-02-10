@@ -1,4 +1,4 @@
-from flaskapp.app import app
+from app import app
 from flask import render_template, redirect
 import datetime
 import redis
