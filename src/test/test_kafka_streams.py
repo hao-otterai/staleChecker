@@ -17,6 +17,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/
 import config
 
 
+global input_schema
+#fields = fieldList.map(lambda fieldName: StructField(fieldName, StringType(), nullable = true))
+input_schema = StructType([StructField(_fieldName, StringType(), nullable = True) for _fieldName in config.INPUT_SCHEMA_FIELDS])
+
+
 # Converts incoming news, Adds timestamp to incoming question
 ### NB - a lot of preprocessing needs to be added here
 def extract_data(data):
@@ -46,12 +51,7 @@ def rdd2df(rdd):
     return  spark.createDataFrame(rdd, input_schema)
 
 
-
 def main():
-
-    global input_schema
-    #fields = fieldList.map(lambda fieldName: StructField(fieldName, StringType(), nullable = true))
-    input_schema = StructType([StructField(_fieldName, StringType(), nullable = True) for _fieldName in config.INPUT_SCHEMA_FIELDS])
 
     spark_conf = SparkConf().setAppName("Spark Streaming Test")
     global sc
@@ -72,8 +72,7 @@ def main():
     count_this_batch = parsed.count().map(lambda x:('=========== Num of news in the batch: %s  ==========' % x)).pprint()
     parsed.pprint()
 
-    spark = SparkSession.builder.master("local").config(conf=SparkConf()).getOrCreate()
-    df = parsed.foreachRDD(process)
+    parsed.foreachRDD(process)
 
     ssc.start()
     ssc.awaitTermination()

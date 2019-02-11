@@ -15,6 +15,8 @@ from pyspark import SparkContext
 from pyspark.conf import SparkConf
 from pyspark.streaming import StreamingContext
 from pyspark.streaming.kafka import KafkaUtils
+from pyspark.sql import SparkSession
+from pyspark.sql.types import *
 
 import config
 import util
@@ -23,6 +25,11 @@ import min_hash
 import preprocess
 import batch_customMinHashLSH as batch_process
 
+
+# schema for converting input news stream RDD[json] to DataFrame
+global input_schema
+input_schema = StructType([StructField(field, StringType(), nullable = True)
+                    for field in config.INPUT_SCHEMA_FIELDS])
 
 def extract_data(data):
     data["ingest_timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
@@ -36,7 +43,7 @@ def getSparkSessionInstance(sparkConf):
     return globals()["sparkSessionSingletonInstance"]
 
 
-def rdd2df(rdd):
+def rdd2df(rdd, input_schema):
     print("==== rdd2df: Converting RDD[json] to DataFrame ====")
     spark = getSparkSessionInstance(rdd.context.getConf())
     return  spark.createDataFrame(rdd, input_schema)
@@ -92,11 +99,11 @@ def get_similar_cands_tags():
     pass
 
 
-def main_process(rdd):
+def main_process(rdd, input_schema):
     if rdd.isEmpty():
         print('rdd is empty')
     else:
-        df = rdd2df(rdd)
+        df = rdd2df(rdd, input_schema)
         #df.printSchema()
         #print(df.first())
         df_pre = preprocess(df)
@@ -192,11 +199,6 @@ def main():
     ssc = StreamingContext(sc, config.SPARK_STREAMING_MINI_BATCH_WINDOW)
     ssc.checkpoint("_spark_streaming_checkpoint")
 
-    # schema for converting input news stream RDD[json] to DataFrame
-    global input_schema
-    input_schema = StructType([StructField(field, StringType(), nullable = True)
-                        for field in config.INPUT_SCHEMA_FIELDS])
-
     # Create and save MinHash and LSH or load them from file
     ### NB should mh and lsh be broadcasted???
     global mh
@@ -216,7 +218,7 @@ def main():
             lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
 
     # preprocess the news
-    parsed_stream.foreachRDD(main_process)
+    parsed_stream.foreachRDD(lambda rdd: main_process(rdd, input_schema))
 
     ssc.start()
     ssc.awaitTermination()

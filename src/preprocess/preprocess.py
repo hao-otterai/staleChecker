@@ -63,7 +63,7 @@ def generate_tag(input_string):
 def store_news_records_redis_orderedby_timestamp(df):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     if config.LOG_DEBUG: print("store preprocessed records by timestamp (latest first)")
-    df_to_rdd = df.rdd.map()
+    df_to_rdd = df.rdd.map(list)
     # rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'), col('timestamp'), col('lsh_hash')).rdd.map()
 
     for q in df_to_rdd:
