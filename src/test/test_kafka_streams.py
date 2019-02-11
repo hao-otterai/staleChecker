@@ -31,13 +31,18 @@ def getSparkSessionInstance(sparkConf):
     return globals()["sparkSessionSingletonInstance"]
 
 
-def rdd2df(rdd):
-    print("===================================")
-    print("rdd2df: Converting RDD[json] to DataFrame...")
-    spark = getSparkSessionInstance(rdd.context.getConf())
-    df = spark.createDataFrame(rdd)
+def process(rdd):
+    df = rdd2df(rdd)
     df.printSchema()
     print(df.first())
+
+def rdd2df(rdd):
+    if rdd.isEmpty():
+        print('rdd is empty')
+        return
+    print("=========== rdd2df: Converting RDD[json] to DataFrame =========")
+    spark = getSparkSessionInstance(rdd.context.getConf())
+    return  spark.createDataFrame(rdd)
 
 def main():
 
@@ -62,7 +67,7 @@ def main():
     parsed.pprint()
 
     spark = SparkSession.builder.master("local").config(conf=SparkConf()).getOrCreate()
-    df = parsed.foreachRDD(rdd2df)
+    df = parsed.foreachRDD(process)
 
     ssc.start()
     ssc.awaitTermination()
