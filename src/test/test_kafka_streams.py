@@ -42,6 +42,7 @@ def main():
 
     # print the entire json
     print("===================================")
+    parsed.printSchema()
     parsed.pprint()
 
     # count this batch
