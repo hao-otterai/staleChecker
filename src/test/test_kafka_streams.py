@@ -21,6 +21,8 @@ def extract_data(data):
     data["ingest_timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
     return data
 
+
+
 def main():
 
     spark_conf = SparkConf().setAppName("Spark Streaming Test")
@@ -38,10 +40,12 @@ def main():
     # Process stream
     parsed = kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))
 
+    # print the entire json
+    print("===================================")
+    parsed.pprint()
+
     # count this batch
     count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).pprint()
-    #count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).collect()
-    #print(count_this_batch)
 
     ssc.start()
     ssc.awaitTermination()

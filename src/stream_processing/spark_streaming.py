@@ -27,8 +27,8 @@ def extract_data(data):
     data["ingest_timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
     return data
 
-def news_preprocess(news):
-    df = news.toDF()
+def news_preprocess(df):
+
     # Clean question body
     clean_body = udf(lambda body: preprocess.filter_body(body), StringType())
     partially_cleaned_data = df.withColumn("cleaned_body", preprocess.clean_body("body"))
@@ -54,6 +54,7 @@ def news_preprocess(news):
     final_data = stemmed_data
     return final_data
 
+
 def compute_minhash_lsh(df, mh, lsh):
     calc_min_hash = udf(lambda x: list(map(lambda x: int(x), mh.calc_min_hash_signature(x))), ArrayType(IntegerType()))
     calc_lsh_hash = udf(lambda x: list(map(lambda x: int(x), lsh.find_lsh_buckets(x))), ArrayType(IntegerType()))
@@ -65,15 +66,23 @@ def compute_minhash_lsh(df, mh, lsh):
     df.foreachPartition(store_lsh_redis_by_topic)
     return df
 
+def newsRDD_to_DF(newsRDD):
+    # Convert RDD[String] to RDD[Row] to DataFrame
+    rowRdd = rdd.map(lambda w: Row(word=w))
+    wordsDataFrame = spark.createDataFrame(rowRdd)
+    return df
+
 def process_news(news, mh, lsh):
     if len(news)==0: return
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
-    news_preprocessed = news_preprocess(news)
-    if config.LOG_DEBUG: print(news_preprocessed.collect())
+    df = newsRDD_to_DF(news)
 
-    news_hashed = compute_minhash_lsh(news_preprocessed, mh, lsh)
-    if config.LOG_DEBUG: print(news_hashed.collect())
+    df_prep = news_preprocess(df)
+    if config.LOG_DEBUG: print(df_prep.collect())
+
+    df_hash = compute_minhash_lsh(df_prep, mh, lsh)
+    if config.LOG_DEBUG: print(df_hash.collect())
 
     # q_id = news["id"]
     # q_mh = mh.calc_min_hash_signature(news["text_body_stemmed"])
@@ -129,6 +138,18 @@ def process_news(news, mh, lsh):
 
 def main():
 
+    # Create and save MinHash and LSH or load them from file
+    if (not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
+        mh = min_hash.MinHash(config.MIN_HASH_K_VALUE)
+        lsh = locality_sensitive_hash.LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
+
+        util.save_pickle_file(mh, config.MIN_HASH_PICKLE)
+        util.save_pickle_file(lsh, config.LSH_PICKLE)
+    else:
+        mh = util.load_pickle_file(config.MIN_HASH_PICKLE)
+        lsh = util.load_pickle_file(config.LSH_PICKLE)
+
+
     spark_conf = SparkConf().setAppName("Spark Streaming MinHashLSH")
 
     global sc
@@ -143,30 +164,17 @@ def main():
     ssc = StreamingContext(sc, config.SPARK_STREAMING_MINI_BATCH_WINDOW)
     ssc.checkpoint("_spark_streaming_checkpoint")
 
-    kafka_stream = KafkaUtils.createDirectStream( ssc, [config.KAFKA_TOPIC],
-            {"metadata.broker.list": "ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092"} )
-
-    # Create and save MinHash and LSH or load them from file
-    if (not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
-        mh = min_hash.MinHash(config.MIN_HASH_K_VALUE)
-        lsh = locality_sensitive_hash.LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
-
-        util.save_pickle_file(mh, config.MIN_HASH_PICKLE)
-        util.save_pickle_file(lsh, config.LSH_PICKLE)
-    else:
-        mh = util.load_pickle_file(config.MIN_HASH_PICKLE)
-        lsh = util.load_pickle_file(config.LSH_PICKLE)
+    kafka_stream = KafkaUtils.createDirectStream( ssc, [config.KAFKA_TOPIC], {"metadata.broker.list": ",".join(config.KAFKA_SERVERS)} )
 
     # Process stream
-    kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))\
-        .map(lambda json_body: extract_data(json_body))\
-        .foreachRDD(lambda rdd: rdd.foreachPartition(lambda entry: process_news(entry, mh, lsh)))
+    parsed_stream = kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))
 
-    # def _print_rdd(rdd): print(rdd.collect())
-    #
-    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
-    #     lambda json_body: extract_data(json_body)).foreachRDD(
-    #     lambda rdd: rdd.foreachPartition(lambda entry: process_news(entry, mh, lsh)))
+    # count this batch
+    count_mini_batch = parsed.count().map(lambda x:('News this mini-batch: %s' % x)).pprint()
+
+    # preprocess the news
+    parsed_stream.map(lambda json_body: extract_data(json_body)).foreachRDD(
+                      lambda rdd: rdd.foreachPartition(lambda entry: process_news(entry, mh, lsh)))
 
     ssc.start()
     ssc.awaitTermination()
