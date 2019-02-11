@@ -197,8 +197,8 @@ def df_preprocess_func(df):
 # Preprocess a data file and upload it
 def main_preprocess_file(bucket_name, file_name):
 
-    final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, \
-    tag_industry, tag_market, source, hot, display_date, display_timestamp, djn_urgency"
+    final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, display_timestamp, djn_urgency"
+    # tag_industry, tag_market,
 
     df_raw = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
     if (config.LOG_DEBUG): df_raw.printSchema()
