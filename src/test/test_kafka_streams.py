@@ -32,17 +32,19 @@ def getSparkSessionInstance(sparkConf):
 
 
 def process(rdd):
-    df = rdd2df(rdd)
-    df.printSchema()
-    print(df.first())
-
-def rdd2df(rdd):
     if rdd.isEmpty():
         print('rdd is empty')
-        return
+    else:
+        df = rdd2df(rdd)
+        df.printSchema()
+        print(df.first())
+
+def rdd2df(rdd):
     print("=========== rdd2df: Converting RDD[json] to DataFrame =========")
     spark = getSparkSessionInstance(rdd.context.getConf())
     return  spark.createDataFrame(rdd)
+
+
 
 def main():
 
@@ -61,9 +63,8 @@ def main():
     # Process stream
     parsed = kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))
 
-    print("===================================")
     # count this batch
-    count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).pprint()
+    count_this_batch = parsed.count().map(lambda x:('=========== Num of news in the batch: %s  ==========' % x)).pprint()
     parsed.pprint()
 
     spark = SparkSession.builder.master("local").config(conf=SparkConf()).getOrCreate()
