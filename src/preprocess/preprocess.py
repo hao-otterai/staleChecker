@@ -61,7 +61,7 @@ def generate_tag(input_string):
 # loadedDf.show()
 """
 def store_preprocessed_news_redis(news_tuple, news_fields):
-    news_dict = dict((k, v) for k, v in zip(news_field, news_tuple))
+    news_dict = dict((k, v) for k, v in zip(news_fields, news_tuple))
     if config.LOG_DEBUG: print("{0} - {1} - {2}".format(news_dict['id'], news_dict['display_date'], news_dict['headline']))
 
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
