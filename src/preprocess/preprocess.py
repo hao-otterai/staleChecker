@@ -64,7 +64,7 @@ def generate_tag(input_string):
 def store_preprocessed_news_redis(iterator, fields):
     for news in iterator:
         news_dict = dict((k, v) for k, v in zip(fields, news))
-        if config.LOG_DEBUG: print(news['id'], news['headline'])
+        if config.LOG_DEBUG: print(news_dict['id'], news_dict['headline'])
 
         rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
         try:
