@@ -22,9 +22,9 @@ def extract_data(data):
     return data
 
 def rdd2df(rdd):
+    print("rdd2df: Converting RDD[json] to DataFrame...")
     df = rdd.toDF()
-    df.printSchema()
-    print(df.collect())
+    df.pprint()
 
 def main():
 
@@ -47,7 +47,7 @@ def main():
     print("===================================")
     parsed.pprint()
 
-    df = parsed.foreachRDD(lambda rdd: rdd.foreachPartition(lambda r: rdd2df(r)))
+    df = parsed.foreachRDD(lambda rdd: rdd2df(rdd))
 
     # count this batch
     count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).pprint()
