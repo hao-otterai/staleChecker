@@ -16,7 +16,7 @@ class Producer(threading.Thread):
                     value_serializer=lambda v: json.dumps(v).encode('utf-8'),
                     api_version=(0, 10))
 
-        file_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "2001_sample_10M_stream.json")
+        file_dir = "/home/ubuntu/staleChecker/src/ingestion/2001_sample_10M_stream.json"
         with open(file_dir) as f: json_file = json.load(f)
         for line in json_file:
             if config.LOG_DEBUG: print(line)
