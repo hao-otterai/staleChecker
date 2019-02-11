@@ -61,21 +61,25 @@ def generate_tag(input_string):
 # loadedDf = spark.read.format("org.apache.spark.sql.redis").option("table", "people").load()
 # loadedDf.show()
 """
-def store_preprocessed_news_redis(iterator, fields):
+def store_preprocessed_news_redis(iterator):
+    """
+    fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, display_timestamp, djn_urgency"
+    """
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for news in iterator:
-        news_dict = dict((k, v) for k, v in zip(fields, news))
-        if config.LOG_DEBUG: print(news_dict['id'], news_dict['headline'])
-
-        rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+        #news_dict = dict((k, v) for k, v in zip(fields, news))
+        #if config.LOG_DEBUG:
+            #print(news_dict['id'], news_dict['headline'])
         try:
-            rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(news_dict['display_timestamp']), json.dumps(news_dict))
+            #rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(news_dict['display_timestamp']), json.dumps(news_dict))
+            rdb.zadd("preprocessed_news", int(news[-2]), news)
             #rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
         except Exception as e:
-            print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news_dict['id']))
+            print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news[0]))
 
 
 def main_store_preprocessed_news_redis(df, fields):
-    df.rdd.map(list).foreachPartition(lambda news_iterator: store_preprocessed_news_redis(news_iterator, fields))
+    df.rdd.map(list).foreachPartition(store_preprocessed_news_redis)
 
 def df_preprocess_func(df):
     # Clean question body
