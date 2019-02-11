@@ -21,6 +21,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/
 import config
 import util
 
+import redis
 
 #import com.databricks.spark.xml
 # os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages com.databricks.spark.xml pyspark-shell"
@@ -109,7 +110,7 @@ def df_preprocess_func(df):
     # if (config.LOG_DEBUG): print("[PROCESSING] Shingling resulting text body...")
     # shingle = udf(lambda tokens: get_two_gram_shingles(tokens), ArrayType(ArrayType(StringType())))
     # shingled_data = stemmed_data.withColumn("text_body_shingled", shingle("text_body_stemmed"))
-    #
+
     # ### get TF-IDF vector
     # if (config.USE_TF_IN_PREPROCESSING):
     #     # Vectorize so we can fit to MinHashLSH model
@@ -129,69 +130,6 @@ def df_preprocess_func(df):
     #     final_data = vdf
     #     final_output_fields += ", text_body_tokenized "
     return final_data
-
-    # # Clean question body
-    # if(config.LOG_DEBUG): print("[PROCESSING]: Cleaning headline and body...")
-    # clean_body = udf(lambda body: filter_body(body), StringType())
-    # partially_cleaned_data = df_raw.withColumn("cleaned_body", clean_body("body"))
-    #
-    #
-    # # generate tags based on company, industry, and market
-    # if (config.LOG_DEBUG): print("[PROCESSING]: Generating news tags based on industry, market and company...")
-    # tag_generator = udf(lambda input_string: generate_tag(input_string), ArrayType(StringType()))
-    # partially_cleaned_data = partially_cleaned_data.withColumn( "tag_company",  tag_generator("company"))
-    # partially_cleaned_data = partially_cleaned_data.withColumn( "tag_industry", tag_generator("industry"))
-    # partially_cleaned_data = partially_cleaned_data.withColumn( "tag_market",   tag_generator("market"))
-    #
-    #
-    # # Concat cleaned question body and question title to form question vector
-    # if (config.LOG_DEBUG): print("[PROCESSING]: Concating headline and body...")
-    # data = partially_cleaned_data.withColumn("text_body", concat(col("headline"), lit(" "), col("cleaned_body")))
-    #
-    # # Tokenize question title
-    # if (config.LOG_DEBUG): print("[PROCESSING]: Tokenizing text vector...")
-    # tokenizer = Tokenizer(inputCol="text_body", outputCol="text_body_tokenized")
-    # tokenized_data = tokenizer.transform(data)
-    #
-    # # Remove stop words
-    # if (config.LOG_DEBUG): print("[PROCESSING]: Removing stop words...")
-    # stop_words_remover = StopWordsRemover(inputCol="text_body_tokenized", outputCol="text_body_stop_words_removed")
-    # stop_words_removed_data = stop_words_remover.transform(tokenized_data)
-    #
-    # # Stem words
-    # if (config.LOG_DEBUG): print("[PROCESSING]: Stemming tokenized vector...")
-    # stem = udf(lambda tokens: lemmatize(tokens), ArrayType(StringType()))
-    # stemmed_data = stop_words_removed_data.withColumn("text_body_stemmed", stem("text_body_stop_words_removed"))
-    # final_data = stemmed_data
-    #
-    # Shingle resulting body
-    # if (config.LOG_DEBUG): print("[PROCESSING] Shingling resulting text body...")
-    # shingle = udf(lambda tokens: get_two_gram_shingles(tokens), ArrayType(ArrayType(StringType())))
-    # shingled_data = stemmed_data.withColumn("text_body_shingled", shingle("text_body_stemmed"))
-    #
-    # ### get TF-IDF vector
-    # if (config.USE_TF_IN_PREPROCESSING):
-    #     # Vectorize so we can fit to MinHashLSH model
-    #     #htf = HashingTF(inputCol="text_body_stemmed", outputCol="raw_features", numFeatures=1000)
-    #     htf = HashingTF(inputCol="text_body_stemmed", outputCol="raw_features")
-    #     htf_df = htf.transform(final_data)
-    #
-    #     if (config.USE_TFIDF): # under maintenance
-    #         idf = IDF(inputCol="rawFeatures", outputCol="features", minDocFreq = config.MIN_DOC_FREQ)
-    #         idfModel = idf.fit(htf_df)
-    #         tfidf = idfModel.transform(featurizedData)
-    #         vectorizer = VectorAssembler(inputCols=["features"], outputCol="text_body_vectorized")
-    #         vdf = vectorizer.transform(htf_df)
-    #     else:
-    #         vectorizer = VectorAssembler(inputCols=["raw_features"], outputCol="text_body_vectorized")
-    #         vdf = vectorizer.transform(htf_df)
-    #     final_data = vdf
-    #     final_output_fields += ", text_body_tokenized "
-    #
-    # # timestamp
-    # if (config.LOG_DEBUG): print("[PROCESSING]: Formatting unix_timestamp ...")
-    # # final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'").cast('timestamp'))
-    # final_data = final_data.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
 
 
 
