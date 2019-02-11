@@ -62,14 +62,14 @@ def generate_tag(input_string):
 """
 def store_preprocessed_news_redis(news_tuple, news_fields):
     news_dict = dict((k, v) for k, v in zip(news_field, news_tuple))
+    if config.LOG_DEBUG: print("{}:{}".format(news_dict['id'], news_dict['headline'], news_dict['display_date'])
+
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-    q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
-                "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
     try:
-        rdb.zadd("preprocessed_news:{0}".format(tag), q.display_timestamp, q_json)
-        rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+        rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(q.display_timestamp), json.dumps(news_dict))
+        #rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
     except Exception as e:
-        print("ERROR: failed to save tag {0} to Redis".format(tag))
+        print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news_dict['id']))
 
 
 def main_store_preprocessed_news_redis(df, news_fields):
@@ -217,12 +217,12 @@ def main_preprocess_file(bucket_name, file_name):
         print(df_preprocessed.first())
 
     # write to Redis
-    #if config.LOG_DEBUG: print("store preprocessed news by timestamp (latest first)")
-    #main_store_preprocessed_news_redis(df_preprocessed, final_output_fields.split(','))
+    if config.LOG_DEBUG: print("store preprocessed news by timestamp (latest first)")
+    main_store_preprocessed_news_redis(df_preprocessed, final_output_fields.split(','))
 
     # Write to AWS
-    #if config.LOG_DEBUG: print("[UPLOAD]: Writing preprocessed data to AWS...")
-    #util.write_json_aws_s3(config.S3_BUCKET_BATCH_PREPROCESSED, file_name, df_preprocessed)
+    if config.LOG_DEBUG: print("[UPLOAD]: Writing preprocessed data to AWS...")
+    util.write_json_aws_s3(config.S3_BUCKET_BATCH_PREPROCESSED, file_name, df_preprocessed)
 
 
 def main():
