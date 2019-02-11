@@ -55,21 +55,20 @@ def generate_tag(input_string):
 
 
 # Store question data
-"""
-# here is a naive implementation. another option is to use the spark-redis package as following:
-# df.write.format("org.apache.spark.sql.redis").option("table", "people").option("key.column", "name").save()
-# loadedDf = spark.read.format("org.apache.spark.sql.redis").option("table", "people").load()
-# loadedDf.show()
-"""
 def store_preprocessed_news_redis(iterator):
     """
+    # here is a naive implementation. another option is to use the spark-redis package as following:
+    # df.write.format("org.apache.spark.sql.redis").option("table", "people").option("key.column", "name").save()
+    # loadedDf = spark.read.format("org.apache.spark.sql.redis").option("table", "people").load()
+    # loadedDf.show()
+
     fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, display_timestamp, djn_urgency"
     """
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for news in iterator:
         #news_dict = dict((k, v) for k, v in zip(fields, news))
-        #if config.LOG_DEBUG:
-            #print(news_dict['id'], news_dict['headline'])
+        if config.LOG_DEBUG:
+            print("id:{0} - headline:{1}".format(news[0], news[1]))
         try:
             #rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(news_dict['display_timestamp']), json.dumps(news_dict))
             rdb.zadd("preprocessed_news", int(news[-2]), news)
