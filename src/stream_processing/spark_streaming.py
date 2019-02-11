@@ -49,36 +49,6 @@ def rdd2df(rdd, input_schema):
     return  spark.createDataFrame(rdd, input_schema)
 
 
-def preprocess(df):
-    # Clean question body
-    clean_body = udf(lambda body: preprocess.filter_body(body), StringType())
-    df_cleaned = df.withColumn("cleaned_body", preprocess.clean_body("body"))
-
-    # generate tags based on company, industry, and market
-    tag_generator = udf(lambda input_string: preprocess.generate_tag(input_string), ArrayType(StringType()))
-    df_tagged = df_cleaned.withColumn( "tag_company",  tag_generator("company"))
-
-    # Concat cleaned question body and question title to form question vector
-    df_textbody = df_tagged.withColumn("text_body", concat(col("headline"), lit(" "), col("cleaned_body")))
-
-    # Tokenize question title
-    tokenizer = Tokenizer(inputCol="text_body", outputCol="text_body_tokenized")
-    df_tokenized = tokenizer.transform(df_textbody)
-
-    # Remove stop words
-    stop_words_remover = StopWordsRemover(inputCol="text_body_tokenized", outputCol="text_body_stop_words_removed")
-    df_stopword = stop_words_remover.transform(df_tokenized)
-
-    # Stem words
-    stem = udf(lambda tokens: lemmatize(tokens), ArrayType(StringType()))
-    df_stemmed = df_stopword.withColumn("text_body_stemmed", stem("text_body_stop_words_removed"))
-
-    # Timestamp
-    final_data = df_stemmed.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
-
-    return final_data
-
-
 
 def compute_minhash_lsh(df):
     calc_min_hash = udf(lambda x: list(map(lambda x: int(x), mh.calc_min_hash_signature(x))), ArrayType(IntegerType()))
@@ -106,7 +76,7 @@ def main_process(rdd, input_schema):
         df = rdd2df(rdd, input_schema)
         #df.printSchema()
         #print(df.first())
-        df_pre = preprocess(df)
+        df_pre = preprocess.df_preprocess_func(df)
         df_hash = compute_minhash_lsh(df_pre)
 
         get_similar_cands_tags(df_hash)
