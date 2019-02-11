@@ -21,9 +21,21 @@ def extract_data(data):
     data["ingest_timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
     return data
 
+
+# Lazily instantiated global instance of SparkSession
+def getSparkSessionInstance(sparkConf):
+    if ("sparkSessionSingletonInstance" not in globals()):
+        globals()["sparkSessionSingletonInstance"] = SparkSession.builder.config(
+            conf=sparkConf).getOrCreate()
+    return globals()["sparkSessionSingletonInstance"]
+
+
 def rdd2df(rdd):
+    print("===================================")
     print("rdd2df: Converting RDD[json] to DataFrame...")
-    df = rdd.toDF()
+    spark = getSparkSessionInstance(rdd.context.getConf())
+    df = spark.createDataFrame(rdd)
+    df.printSchema()
     df.pprint()
 
 def main():
@@ -47,7 +59,10 @@ def main():
     print("===================================")
     parsed.pprint()
 
-    df = parsed.foreachRDD(lambda rdd: rdd2df(rdd))
+
+    from pyspark.sql import SparkSession
+    spark = SparkSession.builder.master("local").config(conf=SparkConf()).getOrCreate()
+    df = parsed.foreachRDD(rdd2df)
 
     # count this batch
     count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).pprint()
