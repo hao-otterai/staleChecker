@@ -45,7 +45,7 @@ def process(rdd):
         df.printSchema()
         print(df.first())
 
-def rdd2df(rdd, schema):
+def rdd2df(rdd):
     print("=========== rdd2df: Converting RDD[json] to DataFrame =========")
     spark = getSparkSessionInstance(rdd.context.getConf())
     return  spark.createDataFrame(rdd, _schema)
