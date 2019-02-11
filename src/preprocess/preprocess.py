@@ -64,6 +64,7 @@ def store_news_records_redis_orderedby_timestamp(df):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     if config.LOG_DEBUG: print("store preprocessed records by timestamp (latest first)")
     df_to_rdd = df.rdd.map()
+    # rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'), col('timestamp'), col('lsh_hash')).rdd.map()
 
     for q in df_to_rdd:
         q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
@@ -83,13 +84,13 @@ def preprocess_file(bucket_name, file_name):
     final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, \
     tag_industry, tag_market, source, hot, display_date, display_timestamp, djn_urgency"
 
-    raw_data = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
-    if (config.LOG_DEBUG): raw_data.printSchema()
+    df_raw = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
+    if (config.LOG_DEBUG): df_raw.printSchema()
 
     # Clean question body
     if(config.LOG_DEBUG): print("[PROCESSING]: Cleaning headline and body...")
     clean_body = udf(lambda body: filter_body(body), StringType())
-    partially_cleaned_data = raw_data.withColumn("cleaned_body", clean_body("body"))
+    partially_cleaned_data = df_raw.withColumn("cleaned_body", clean_body("body"))
 
 
     # generate tags based on company, industry, and market
