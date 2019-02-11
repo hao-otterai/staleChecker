@@ -3,3 +3,4 @@ data/
 *.scala
 src/**/*.pickle
  _spark_streaming_checkpoint/
+metastore_db/
