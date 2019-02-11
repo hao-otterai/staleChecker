@@ -21,7 +21,10 @@ def extract_data(data):
     data["ingest_timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
     return data
 
-
+def rdd2df(rdd):
+    df = rdd.toDF()
+    df.printSchema()
+    print(df.collect())
 
 def main():
 
@@ -44,7 +47,7 @@ def main():
     print("===================================")
     parsed.pprint()
 
-    df = parsed.foreachRDD(lambda rdd: rdd.foreachPartition(lambda r: r.toDF().pprint()))
+    df = parsed.foreachRDD(lambda rdd: rdd.foreachPartition(lambda r: rdd2df(r)))
 
     # count this batch
     count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).pprint()
