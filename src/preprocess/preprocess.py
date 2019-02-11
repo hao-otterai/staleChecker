@@ -63,7 +63,7 @@ def generate_tag(input_string):
 """
 def store_preprocessed_news_redis(news, fields):
     news_dict = dict((k, v) for k, v in zip(fields, news))
-    if config.LOG_DEBUG: print(news_dict)
+    if config.LOG_DEBUG: print(news)
 
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     try:
