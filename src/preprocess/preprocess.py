@@ -60,20 +60,22 @@ def generate_tag(input_string):
 # loadedDf = spark.read.format("org.apache.spark.sql.redis").option("table", "people").load()
 # loadedDf.show()
 """
-def store_preprocessed_news_redis(news_tuple, news_fields):
-    news_dict = dict((k, v) for k, v in zip(news_fields, news_tuple))
-    if config.LOG_DEBUG: print("{0} - {1} - {2}".format(news_dict['id'], news_dict['display_date'], news_dict['headline']))
+def store_preprocessed_news_redis(news, fields):
+    news_dict = dict((k, v) for k, v in zip(fields, news))
+    if config.LOG_DEBUG:
+        print(news_dict)
+        #print("{0} - {1} - {2}".format(news_dict['id'], news_dict['display_date'], news_dict['headline']))
 
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     try:
-        rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(q.display_timestamp), json.dumps(news_dict))
+        rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(news_dict['display_timestamp']), json.dumps(news_dict))
         #rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
     except Exception as e:
         print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news_dict['id']))
 
 
 def main_store_preprocessed_news_redis(df, news_fields):
-    df.rdd.map(tuple).foreachPartition(lambda news_tuple: store_preprocessed_news_redis(news_tuple, news_fields))
+    df.rdd.map(list).foreachPartition(lambda news: store_preprocessed_news_redis(news, news_fields))
 
 
 def df_preprocess_func(df):
