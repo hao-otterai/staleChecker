@@ -78,11 +78,11 @@ def main_store_preprocessed_news_redis(df, news_fields):
 
 def df_preprocess_func(df):
     # Clean question body
-    clean_body = udf(lambda body: preprocess.filter_body(body), StringType())
-    df_cleaned = df.withColumn("cleaned_body", preprocess.clean_body("body"))
+    clean_body = udf(lambda body: filter_body(body), StringType())
+    df_cleaned = df.withColumn("cleaned_body", clean_body("body"))
 
     # generate tags based on company, industry, and market
-    tag_generator = udf(lambda input_string: preprocess.generate_tag(input_string), ArrayType(StringType()))
+    tag_generator = udf(lambda input_string: generate_tag(input_string), ArrayType(StringType()))
     df_tagged = df_cleaned.withColumn( "tag_company",  tag_generator("company"))
 
     # Concat cleaned question body and question title to form question vector
