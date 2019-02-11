@@ -42,8 +42,9 @@ def main():
 
     # print the entire json
     print("===================================")
-    parsed.printSchema()
     parsed.pprint()
+
+    df = parsed.foreachRDD(lambda rdd: rdd.foreachPartition(lambda r: r.toDF().pprint()))
 
     # count this batch
     count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).pprint()
