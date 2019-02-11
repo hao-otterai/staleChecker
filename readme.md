@@ -34,3 +34,8 @@ related content on social media.
 
 
 ### Stretch Goals
+
+### references
+https://towardsdatascience.com/understanding-locality-sensitive-hashing-49f6d1f6134
+https://santhoshhari.github.io/Locality-Sensitive-Hashing/
+https://eng.uber.com/lsh/

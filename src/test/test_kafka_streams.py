@@ -17,11 +17,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/
 import config
 
 
-_fields = ['body', 'display_date', 'djn_urgency', 'headline', 'industry', 'id', 'source', 'hot', 'company', 'market']
-#fields = fieldList.map(lambda fieldName: StructField(fieldName, StringType(), nullable = true))
-_schema = StructType([StructField(_fieldName, StringType(), nullable = True) for _fieldName in _fields])
-
-
 # Converts incoming news, Adds timestamp to incoming question
 ### NB - a lot of preprocessing needs to be added here
 def extract_data(data):
@@ -48,34 +43,15 @@ def process(rdd):
 def rdd2df(rdd):
     print("=========== rdd2df: Converting RDD[json] to DataFrame =========")
     spark = getSparkSessionInstance(rdd.context.getConf())
-    return  spark.createDataFrame(rdd, _schema)
+    return  spark.createDataFrame(rdd, input_schema)
 
 
 
 def main():
 
-    ### add schema here
-    # {u'body': u" Fro ",
-    # u'display_date': u'20010126T031500.000Z',
-    # u'djn_urgency': u'0',
-    # u'headline': u'WSJ(1/26): Corrections & Amplifications',
-    # u'industry': u'uns',
-    # u'id': u'200110-6238',
-    # u'source': u'DJDN',
-    # u'hot': u'N',
-    # u'company': u'uns',
-    # u'market': u'M/NND;M/TPX'}
-
-    # |-- body: string (nullable = true)
-    # |-- company: string (nullable = true)
-    # |-- display_date: string (nullable = true)
-    # |-- djn_urgency: string (nullable = true)
-    # |-- headline: string (nullable = true)
-    # |-- hot: string (nullable = true)
-    # |-- id: string (nullable = true)
-    # |-- industry: string (nullable = true)
-    # |-- market: string (nullable = true)
-    # |-- source: string (nullable = true)
+    global input_schema
+    #fields = fieldList.map(lambda fieldName: StructField(fieldName, StringType(), nullable = true))
+    input_schema = StructType([StructField(_fieldName, StringType(), nullable = True) for _fieldName in config.INPUT_SCHEMA_FIELDS])
 
     spark_conf = SparkConf().setAppName("Spark Streaming Test")
     global sc

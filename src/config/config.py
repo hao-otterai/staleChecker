@@ -60,3 +60,5 @@ MIN_DOC_FREQ = 2
 
 # time window for news similarity search
 TIME_WINDOW = 432000 #3600*24*3
+
+INPUT_SCHEMA_FIELDS = ['body', 'display_date', 'djn_urgency', 'headline', 'industry', 'id', 'source', 'hot', 'company', 'market']

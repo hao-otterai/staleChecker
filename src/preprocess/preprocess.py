@@ -52,6 +52,31 @@ def get_tri_gram_shingles(tokens):
 def generate_tag(input_string):
     return input_string.replace('/','_').split(";") if len(input_string)>0 else ['<UNS>']
 
+
+# Store question data
+"""
+# here is a naive implementation. another option is to use the spark-redis package as following:
+# df.write.format("org.apache.spark.sql.redis").option("table", "people").option("key.column", "name").save()
+# loadedDf = spark.read.format("org.apache.spark.sql.redis").option("table", "people").load()
+# loadedDf.show()
+"""
+def store_news_records_redis_orderedby_timestamp(df):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    if config.LOG_DEBUG: print("store preprocessed records by timestamp (latest first)")
+    df_to_rdd = df.rdd.map()
+
+    for q in df_to_rdd:
+        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
+                    "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
+        try:
+            for tag in q.tag_company:
+                rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
+                rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+        except Exception as e:
+            print("ERROR: failed to save tag {0} to Redis".format(tag))
+
+
+
 # Preprocess a data file and upload it
 def preprocess_file(bucket_name, file_name):
 
@@ -65,6 +90,7 @@ def preprocess_file(bucket_name, file_name):
     if(config.LOG_DEBUG): print("[PROCESSING]: Cleaning headline and body...")
     clean_body = udf(lambda body: filter_body(body), StringType())
     partially_cleaned_data = raw_data.withColumn("cleaned_body", clean_body("body"))
+
 
     # generate tags based on company, industry, and market
     if (config.LOG_DEBUG): print("[PROCESSING]: Generating news tags based on industry, market and company...")
@@ -122,7 +148,6 @@ def preprocess_file(bucket_name, file_name):
     if (config.LOG_DEBUG): print("[PROCESSING]: Formatting unix_timestamp ...")
     # final_data = stemmed_data.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'").cast('timestamp'))
     final_data = final_data.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
-
 
     # Extract data that we want
     final_data.registerTempTable("final_data")
