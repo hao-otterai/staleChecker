@@ -9,6 +9,7 @@ from pyspark import SparkContext
 from pyspark.conf import SparkConf
 from pyspark.streaming import StreamingContext
 from pyspark.streaming.kafka import KafkaUtils
+from pyspark.sql import SparkSession
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages org.apache.spark:spark-streaming-kafka-0-8_2.11:2.2.0 pyspark-shell"
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
@@ -59,8 +60,6 @@ def main():
     print("===================================")
     parsed.pprint()
 
-
-    from pyspark.sql import SparkSession
     spark = SparkSession.builder.master("local").config(conf=SparkConf()).getOrCreate()
     df = parsed.foreachRDD(rdd2df)
 
