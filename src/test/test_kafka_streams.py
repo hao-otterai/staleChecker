@@ -37,7 +37,7 @@ def rdd2df(rdd):
     spark = getSparkSessionInstance(rdd.context.getConf())
     df = spark.createDataFrame(rdd)
     df.printSchema()
-    df.pprint()
+    print(df.first())
 
 def main():
 
@@ -56,15 +56,13 @@ def main():
     # Process stream
     parsed = kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))
 
-    # print the entire json
     print("===================================")
+    # count this batch
+    count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).pprint()
     parsed.pprint()
 
     spark = SparkSession.builder.master("local").config(conf=SparkConf()).getOrCreate()
     df = parsed.foreachRDD(rdd2df)
-
-    # count this batch
-    count_this_batch = parsed.count().map(lambda x:('News this batch: %s' % x)).pprint()
 
     ssc.start()
     ssc.awaitTermination()
