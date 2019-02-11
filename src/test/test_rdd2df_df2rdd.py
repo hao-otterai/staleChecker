@@ -29,6 +29,13 @@ def main():
     df.printSchema()
     print(df.first())
 
+    # play with dataframe
+    def f(iterator):
+        for ii in iterator:
+            print(ii)
+    df.rdd.map(list).foreachPartition(f)
+
+
     back2rdd = df.rdd.map(list)
     print(back2rdd.first())
 

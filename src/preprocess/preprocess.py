@@ -63,9 +63,7 @@ def generate_tag(input_string):
 """
 def store_preprocessed_news_redis(news, fields):
     news_dict = dict((k, v) for k, v in zip(fields, news))
-    if config.LOG_DEBUG:
-        print(news_dict)
-        #print("{0} - {1} - {2}".format(news_dict['id'], news_dict['display_date'], news_dict['headline']))
+    if config.LOG_DEBUG: print(news_dict)
 
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     try:
@@ -75,9 +73,8 @@ def store_preprocessed_news_redis(news, fields):
         print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news_dict['id']))
 
 
-def main_store_preprocessed_news_redis(df, news_fields):
-    df.rdd.map(list).foreachPartition(lambda news: store_preprocessed_news_redis(news, news_fields))
-
+def main_store_preprocessed_news_redis(df, fields):
+    df.rdd.map(list).foreachPartition(lambda news: store_preprocessed_news_redis(news, fields))
 
 def df_preprocess_func(df):
     # Clean question body
