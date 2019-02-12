@@ -28,10 +28,10 @@ import redis
 
 # Removes code snippets and other irregular sections from question body, returns cleaned string
 def filter_body(body):
-    remove_code = re.sub('<[^>]+>', '', body)
-    remove_punctuation = re.sub(r"[^\w\s]", " ", remove_code)
-    remove_numerical = re.sub(r"[-?0-9]+", " ", remove_punctuation)
-    remove_spaces = remove_numerical.replace("\n", " ")
+    remove_code = re.sub('<[^>]+>', "", body)
+    remove_punctuation = re.sub(r"[^\w\s]", "", remove_code)
+    remove_numerical = re.sub(r"[-?0-9]+", "", remove_punctuation)
+    remove_spaces = remove_numerical.replace("\n", "")
     return remove_spaces.encode('ascii', 'ignore')
 
 
@@ -102,7 +102,11 @@ def df_preprocess_func(df):
 
     # Stem words
     stem = udf(lambda tokens: lemmatize(tokens), ArrayType(StringType()))
-    df_stemmed = df_stopword.withColumn("text_body_stemmed", stem("text_body_stop_words_removed"))
+    df_stemmed0 = df_stopword.withColumn("text_body_stemmed0", stem("text_body_stop_words_removed"))
+
+    # remove words shorter than certain length, 2 for instance
+    final_len_filter = udf(lambda tokens: [tok for tok in tokens if len(tok)>1], ArrayType(StringType()))
+    df_stemmed = df_stemmed0.withColumn("text_body_stemmed", final_len_filter("text_body_stemmed0"))
 
     # Timestamp
     final_data = df_stemmed.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
