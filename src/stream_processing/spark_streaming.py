@@ -152,7 +152,7 @@ def main():
 
     global ssc
     ssc = StreamingContext(sc, config.SPARK_STREAMING_MINI_BATCH_WINDOW)
-    ssc.checkpoint("_spark_streaming_checkpoint")
+    #ssc.checkpoint("_spark_streaming_checkpoint")
 
     # Create and save MinHash and LSH or load them from file
     ### NB should mh and lsh be broadcasted???
