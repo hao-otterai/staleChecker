@@ -82,7 +82,7 @@ def process_news(news):
         print("============================================")
 
 
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    #rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
     #
     # #for tag in news.tag_company:
