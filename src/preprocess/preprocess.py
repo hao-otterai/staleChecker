@@ -68,7 +68,8 @@ def store_preprocessed_news_redis(iterator):
     for news in iterator:
         #news_dict = dict((k, v) for k, v in zip(fields, news))
         if config.LOG_DEBUG:
-            print("id:{0} - headline:{1}".format(news[0], news[1]))
+            print(news)
+            #print("id:{0} - headline:{1}".format(news[0], news[1]))
         try:
             #rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(news_dict['display_timestamp']), json.dumps(news_dict))
             rdb.zadd("preprocessed_news", int(news[-2]), news)
