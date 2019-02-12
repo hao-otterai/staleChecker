@@ -156,7 +156,7 @@ def main():
 
     # Create and save MinHash and LSH or load them from file
     ### NB should mh and lsh be broadcasted???
-    mh, lsh = load_mh_lsh()
+    mh, lsh = batch_process.load_mh_lsh()
 
     # Kafka stream
     kafka_stream = KafkaUtils.createDirectStream( ssc,
