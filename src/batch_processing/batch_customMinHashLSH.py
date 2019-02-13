@@ -98,10 +98,9 @@ def find_similar_cands_per_tag(tag, mh, lsh):
                         # .withColumn("id_headline", concat(col("id"), lit(";;"), col("headline"), lit(";;"), col("timestamp")))
 
     find_lsh_sim = udf(lambda x, y: lsh.common_bands_count(x, y), IntegerType())
-    find_mh_js = udf(lambda x, y: mh.jaccard_sim_score(x, y))
+    find_mh_js = udf(lambda x, y: util.jaccard_sim_score(x, y))
     for ids in common_bucket:
         sub = df.filter(col('id').isin(ids))
-
         lsh_cand_df = sub.alias('q1').join(sub.alias('q2'), (col("q1.timestamp") > col("q2.timestamp")) &
             (col("q1.timestamp") < col("q2.timestamp") + config.TIME_WINDOW)).select(
             col("q1.id").alias("q1_id"),
