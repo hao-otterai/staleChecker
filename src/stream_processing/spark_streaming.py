@@ -63,6 +63,7 @@ def process_mini_batch(rdd, input_schema):
     # iterate over the news in each partition
     def _process_news_iter(iter):
         for news in iter: process_news(news)
+
     df_with_hash_sig.foreachPartition(_process_news_iter)
 
 
@@ -96,15 +97,37 @@ def process_news(news):
     df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
             col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT).withColumn(
             'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
-            col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+            col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD).orderby()
 
     if config.LOG_DEBUG:
         cnt = df.count()
         print(cnt, df.first())
 
-    cand_reformatted = (tag, q_id, news["title"], entry["id"], entry["title"], news["timestamp"])
-    print("Found candidate: {0}".format(cand_reformatted))
-    rdb.zadd("dup_cand", mh_comparison, cand_reformatted)
+    # Store similar candidates in Redis
+    def store_similar_cands_redis(similar_dict):
+        """
+        input - similar_dict:
+            key: (id, headline, timestamp)
+            val: [jaccard_sim,  (id, headline, timestamp)]
+        """
+        rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+        for cand in similar_dict:
+            token = "dup_cand:{}".format(cand[0])
+            for sim in similar_dict[cand]:
+                val = (cand[1], cand[2], sim[1])
+                # Store by jaccard_sim_score
+                rdb.zadd(token, sim[0], val)
+
+    def save_dup_to_redis(iter, news):
+        rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+        token = "dup_cand:{}".format((news['id'], news['headline'], news['timestamp']))
+        for entry in iter:
+            cand_reformatted = (tag, q_id, entry["id"], entry["headline"], entry["headline"], news["timestamp"])
+            print("Found candidate: {0}".format(cand_reformatted))
+            rdb.zadd("dup_cand", mh_comparison, cand_reformatted)
+
+    df.foreachPartition(lambda iter: save_dup_to_redis(iter, news))
+
 
 #     # find set of news ids which have at least one common lsh bucket
 #     #if config.LOG_DEBUG: df.printSchema()
