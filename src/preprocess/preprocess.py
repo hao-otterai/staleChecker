@@ -54,35 +54,35 @@ def generate_tag(input_string):
     return input_string.replace('/','_').split(";") if len(input_string)>0 else ['<UNS>']
 
 
-# Store question data
-def store_preprocessed_news_redis(iterator):
-    """
-    # here is a naive implementation. another option is to use the spark-redis package as following:
-    # df.write.format("org.apache.spark.sql.redis").option("table", "people").option("key.column", "name").save()
-    # loadedDf = spark.read.format("org.apache.spark.sql.redis").option("table", "people").load()
-    # loadedDf.show()
 
-    fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
-    """
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-    for news in iterator:
-        #news_dict = dict((k, v) for k, v in zip(fields, news))
-        #if config.LOG_DEBUG:
-            #print(news)
-            #print("id:{0} - headline:{1}".format(news[0], news[1]))
-        try:
-            #rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(news_dict['timestamp']), json.dumps(news_dict))
-            rdb.zadd("preprocessed_news", int(news[-2]), news[:2]+news[5:])
-            #rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
-        except Exception as e:
-            print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news[0]))
+def store_preprocessed_redis(df):
+    # Store news data
+    def helper(iterator):
+        """
+        # here is a naive implementation. another option is to use the spark-redis package as following:
+        # df.write.format("org.apache.spark.sql.redis").option("table", "people").option("key.column", "name").save()
+        # loadedDf = spark.read.format("org.apache.spark.sql.redis").option("table", "people").load()
+        # loadedDf.show()
 
+        fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
+        """
+        rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+        for news in iterator:
+            #news_dict = dict((k, v) for k, v in zip(fields, news))
+            #if config.LOG_DEBUG:
+                #print(news)
+                #print("id:{0} - headline:{1}".format(news[0], news[1]))
+            try:
+                #rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(news_dict['timestamp']), json.dumps(news_dict))
+                rdb.zadd("preprocessed", int(news[-2]), news[:2]+news[4:6]+news[9:10])
+                #rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+            except Exception as e:
+                print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news[0]))
+    df.rdd.map(list).foreachPartition(helper)
 
-def main_store_preprocessed_news_redis(df, fields):
-    df.rdd.map(list).foreachPartition(store_preprocessed_news_redis)
 
 def df_preprocess_func(df):
-    # Clean question body
+    # Clean body
     clean_body = udf(lambda body: filter_body(body), StringType())
     df_cleaned = df.withColumn("cleaned_body", clean_body("body"))
 
@@ -90,10 +90,10 @@ def df_preprocess_func(df):
     tag_generator = udf(lambda input_string: generate_tag(input_string), ArrayType(StringType()))
     df_tagged = df_cleaned.withColumn( "tag_company",  tag_generator("company"))
 
-    # Concat cleaned question body and question title to form question vector
+    # Concat cleaned body and headline to form vector
     df_textbody = df_tagged.withColumn("text_body", concat(col("headline"), lit(" "), col("cleaned_body")))
 
-    # Tokenize question title
+    # Tokenize text
     tokenizer = Tokenizer(inputCol="text_body", outputCol="text_body_tokenized")
     df_tokenized = tokenizer.transform(df_textbody)
 
@@ -163,8 +163,8 @@ def main_preprocess_file(bucket_name, file_name):
         print(df_preprocessed.first())
 
     # write to Redis
-    #if config.LOG_DEBUG: print("store preprocessed news by timestamp (latest first)")
-    #main_store_preprocessed_news_redis(df_preprocessed, final_output_fields.split(','))
+    if config.LOG_DEBUG: print("store preprocessed news by timestamp (latest first)")
+    store_preprocessed_redis(df_preprocessed) #final_output_fields.split(',')
 
     # Write to AWS
     if config.LOG_DEBUG: print("[UPLOAD]: Writing preprocessed data to AWS...")
