@@ -38,7 +38,7 @@ MIN_HASH_K_VALUE = 200
 LSH_NUM_BANDS = 40
 LSH_BAND_WIDTH = 5
 LSH_NUM_BUCKETS = 20
-LSH_SIMILARITY_BAND_COUNT = 5  # Number of common bands needed for MinHash comparison
+LSH_SIMILARITY_BAND_COUNT = 3  # Number of common bands needed for MinHash comparison
 
 
 # Dump files to synchronize models across spark streaming/batch
