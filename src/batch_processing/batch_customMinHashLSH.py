@@ -77,7 +77,7 @@ def store_dup_cand_redis(tag, rdd):
 
 
 # Compares LSH signatures, MinHash signature, and find duplicate candidates
-def find_similar_cands_per_tag(tag):
+def find_similar_cands_per_tag(tag, mh, lsh):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
     # Fetch all news. ideally, sort the news by timestamp, and get within a range of timestamps
@@ -246,7 +246,7 @@ def main():
         tag = lsh_key.replace("lsh:", "")
         tq_table_size = rdb.zcard("lsh:{0}".format(tag))
         if tq_table_size < 2: continue
-        find_similar_cands_per_tag(tag)
+        find_similar_cands_per_tag(tag, mh, lsh)
 
     end_time = time.time()
     print("Spark Custom MinHashLSH run time (seconds): {0} seconds".format(end_time - start_time))
