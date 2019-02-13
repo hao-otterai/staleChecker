@@ -58,11 +58,11 @@ def generate_tag(input_string):
 def store_preprocessed_redis(iter):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for news in iterator:
-        token = "preprocessed:{0}".format(news.id)
+        #token = "preprocessed:{0}".format(news.id)
         save_content = [news.id, news.headline, news.text_body_stemmed, news.timestamp]
-        if config.LOG_DEBUG: print(token, save_content)
+        if config.LOG_DEBUG: print(save_content)
         try:
-            rdb.set(token, save_content)
+            rdb.zadd("preprocessed", news.timestamp, save_content)
         except Exception as e:
             print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news.id))
     # Store news data
