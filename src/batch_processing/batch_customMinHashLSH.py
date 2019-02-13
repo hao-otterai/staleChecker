@@ -67,7 +67,53 @@ def store_lsh_redis_by_tag(rdd):
             print("ERROR: failed to save tag {0} to Redis".format(tag))
 
 
+<<<<<<< HEAD
 def store_dup_cand_redis(tag, rdd):
+=======
+
+def get_jaccard_similarity(candidate_set):
+    """
+    Input whole df to calculate similar sets base on candidate_set,
+    create base set and its similar sets in a dictionary.
+    return = {base_set:(similar_set:jaccard_similarity, )}
+    """
+    #start_time = time.time()
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    _similar_dict = {}
+    #if config.LOG_DEBUG: print('get_jaccard_similarity=>candidate_set=%s'%(str(candidate_set)))
+    for _b_set, _s_set in itertools.permutations(candidate_set,2):
+        _similar_dict[(_b_set[0],_b_set[2],_b_set[3])] = []
+        if _b_set[3] < _s_set[3] or _b_set[3] > (_s_set[3] + config.TIME_WINDOW):
+            continue
+        #calculate jaccard similarity and update redis cache
+        jaccard_sim_token = 'jaccard_sim:{}:{}'.format(_b_set[0], _s_set[0])
+        _jaccard_similarity = rdb.get(jaccard_sim_token)
+        if _jaccard_similarity is None:
+            _jaccard_similarity = util.jaccard_sim_score(_b_set[1], _s_set[1])
+            rdb.set(jaccard_sim_token, _jaccard_similarity)
+        # Store the result and get top NUM_OF_MOST_SIMILAR_SET similar sets
+        if _jaccard_similarity > config.DUP_QUESTION_MIN_HASH_THRESHOLD:
+            _similar_dict[(_b_set[0],_b_set[2],_b_set[3])].append([_jaccard_similarity, (_s_set[0],_s_set[2],_s_set[3]) ])
+    # filter and select top similar set.
+    _similar_dict = dict( [(k,sorted(v, key=lambda x: (x[0],-x[1][2]), reverse=True)[:config.NUM_OF_MOST_SIMILAR_SET])
+                        for k,v in _similar_dict.items() if len(v)>0])
+    #if config.LOG_DEBUG: print('get_jaccard_similarity=> _similar_dict=%s'%(_similar_dict))
+    #end_time = time.time()
+    #if config.LOG_DEBUG: print("get_jaccard_similarity run time (seconds): {0} seconds".format(end_time - start_time))
+    return _similar_dict
+
+
+
+
+
+# Store similar candidates in Redis
+def store_similar_cands_redis(similar_dict):
+    """
+    input - similar_dict:
+        key: (id, headline, timestamp)
+        val: [jaccard_sim,  (id, headline, timestamp)]
+    """
+>>>>>>> temp
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for cand in rdd:
         cand_reformatted = (tag, cand.q1_headline, cand.q1_timestamp, cand.q2_id, cand.q2_headline,  cand.q2_timestamp)
@@ -85,6 +131,7 @@ def find_similar_cands_per_tag(tag, mh, lsh):
 
     if config.LOG_DEBUG: print("tag {0}: {1} news".format(tag, len(tq)))
     df = sql_context.read.json(sc.parallelize(tq))
+<<<<<<< HEAD
 
     # find set of news ids which have at least one common lsh bucket
     #if config.LOG_DEBUG: df.printSchema()
@@ -215,6 +262,50 @@ def find_similar_cands_per_tag(tag, mh, lsh):
 #             val = (cand[1], cand[2], sim[1])
 #             # Store by jaccard_sim_score
 #             rdb.zadd(token, sim[0], val)
+=======
+
+    # find set of news ids which have at least one common lsh bucket
+    #if config.LOG_DEBUG: df.printSchema()
+    def custom_extend(a,b): # both a, b are list
+        a.extend(b)
+        return a
+
+    rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'), col('timestamp'), col('lsh_hash')).rdd.flatMap(
+        lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])]) for band, hash in enumerate(x[4]))).reduceByKey(
+        lambda a, b: custom_extend(a,b)).filter(lambda x: len(x[1])>1).map(lambda x: tuple(x[1]))
+    #if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_common_bucket.collect()))
+
+    def _merge_result(acc_list, value_list):
+        # Remove redundant similar sets from each partitions
+        output = []
+        for _v in value_list+acc_list:
+            if _v not in output: output.append(_v)
+            #if config.LOG_DEBUG > 1: print('LSH.get_merge_result=> _final_dict=%s'%(_final_dict))
+        return output
+
+    rdd_cands = rdd_common_bucket.map(lambda cand_set: get_jaccard_similarity(cand_set))
+    #if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_cands.first()))
+
+    similar_sets_dict = rdd_cands.flatMap(lambda x: x.items()).reduceByKey(lambda acc, val: _merge_result(acc, val)).collect() #.collectAsMap()
+    #if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_sets_dict))
+
+    # save results to Redis
+    store_similar_cands_redis(similar_sets_dict)
+
+
+# Compares LSH signatures, MinHash signature, and find duplicate candidates
+def main_find_similar_cands():
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+
+    # Fetch all tags from lsh_keys set
+    for lsh_key in rdb.sscan_iter("lsh_keys", match="*", count=500):
+        tag = lsh_key.replace("lsh:", "")
+        tq_table_size = rdb.zcard("lsh:{0}".format(tag))
+        if tq_table_size < 2: continue
+
+        find_similar_cands_per_tag(tag)
+
+>>>>>>> temp
 
 
 
