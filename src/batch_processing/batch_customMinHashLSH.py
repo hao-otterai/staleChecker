@@ -50,6 +50,21 @@ def compute_minhash_lsh(df, mh, lsh):
     return df
 
 
+# Store news data
+def store_lsh_redis_by_tag(rdd):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    if config.LOG_DEBUG: print("store minhash and lsh by tag (company)")
+    for q in rdd:
+        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
+                    "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
+        try:
+            for tag in q.tag_company:
+                rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
+                rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+        except Exception as e:
+            print("ERROR: failed to save tag {0} to Redis".format(tag))
+
+
 
 def get_jaccard_similarity(candidate_set):
     """
@@ -112,19 +127,6 @@ def find_similar_cands_lsh(df):
     return similar_sets_dict
 
 
-# Store question data
-def store_lsh_redis_by_tag(rdd):
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-    if config.LOG_DEBUG: print("store minhash and lsh by tag (company)")
-    for q in rdd:
-        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
-                    "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
-        try:
-            for tag in q.tag_company:
-                rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
-                rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
-        except Exception as e:
-            print("ERROR: failed to save tag {0} to Redis".format(tag))
 
 
 
