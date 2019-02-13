@@ -55,7 +55,7 @@ def generate_tag(input_string):
 
 
 
-def store_preprocessed_redis(iter):
+def store_preprocessed_redis(iterator):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for news in iterator:
         #token = "preprocessed:{0}".format(news.id)
