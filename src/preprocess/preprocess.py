@@ -55,7 +55,16 @@ def generate_tag(input_string):
 
 
 
-def store_preprocessed_redis(df):
+def store_preprocessed_redis(iter):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    for news in iterator:
+        token = "preprocessed:{0}".format(news.id)
+        save_content = [news.id, news.headline, news.text_body_stemmed, news.timestamp]
+        if config.LOG_DEBUG: print(token, save_content)
+        try:
+            rdb.set(token, save_content)
+        except Exception as e:
+            print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news.id))
     # Store news data
     # def helper(iterator):
     #     """
@@ -77,18 +86,6 @@ def store_preprocessed_redis(df):
     #         except Exception as e:
     #             print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news[0]))
     # df.rdd.map(list).foreachPartition(helper)
-    def helper(iterator):
-        rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-        for news in iterator:
-            token = "preprocessed:{0}".format(news.id)
-            save_content = [news.id, news.headline, news.text_body_stemmed, news.timestamp]
-            #if config.LOG_DEBUG: print(save_content)
-            try:
-                rdb.set(token, save_content)
-            except Exception as e:
-                print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news.id))
-    df.foreachPartition(helper)
-
 
 def df_preprocess_func(df):
     # Clean body
@@ -173,7 +170,7 @@ def main_preprocess_file(bucket_name, file_name):
 
     # write to Redis
     if config.LOG_DEBUG: print("store preprocessed news")
-    store_preprocessed_redis(df_preprocessed) #final_output_fields.split(',')
+    df_preprocessed.foreachPartition(store_preprocessed_redis)
 
     # Write to AWS
     if config.LOG_DEBUG: print("[UPLOAD]: Writing preprocessed data to AWS...")

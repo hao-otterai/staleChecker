@@ -23,7 +23,7 @@ import util
 import locality_sensitive_hash
 import min_hash
 import preprocess
-import batch_customMinHashLSH as batch_process
+import batchCustomMinHashLSH as batch_process
 
 
 # Lazily instantiated global instance of SparkSession
