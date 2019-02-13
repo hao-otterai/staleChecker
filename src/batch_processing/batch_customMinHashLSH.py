@@ -51,7 +51,7 @@ def compute_minhash_lsh(df, mh, lsh):
     # Store news data
     def store_lsh_redis_by_tag(rdd):
         rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-        if config.LOG_DEBUG: print("store minhash and lsh by tag (company)")
+        if config.LOG_DEBUG: print("store minhash and lsh by company tag")
         for q in rdd:
             q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
                         "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
@@ -91,6 +91,7 @@ def get_jaccard_similarity(candidate_set):
             rdb.set(jaccard_sim_token, _jaccard_similarity)
 
         # Store the result and get top NUM_OF_MOST_SIMILAR_SET similar sets
+        _jaccard_similarity = float(_jaccard_similarity)
         if _jaccard_similarity > config.DUP_QUESTION_MIN_HASH_THRESHOLD:
             _similar_dict[(_b_set[0],_b_set[2],_b_set[3])].append([_jaccard_similarity, (_s_set[0],_s_set[2],_s_set[3]) ])
 
@@ -141,9 +142,10 @@ def find_similar_cands_per_tag(tag, mh, lsh):
                 # Store by jaccard_sim_score
                 rdb.zadd(token, sim[0], val)
 
-
-    rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'), col('timestamp'), col('lsh_hash')).rdd.flatMap(
-        lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])]) for band, hash in enumerate(x[4]))).reduceByKey(
+    rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'),
+        col('timestamp'), col('lsh_hash')).rdd.flatMap(
+        lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])])
+                for band, hash in enumerate(x[4]))).reduceByKey(
         lambda a, b: _custom_extend(a,b)).filter(lambda x: len(x[1])>1).map(lambda x: tuple(x[1]))
     #if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_common_bucket.collect()))
 
@@ -151,7 +153,7 @@ def find_similar_cands_per_tag(tag, mh, lsh):
     #if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_cands.first()))
 
     similar_dict = rdd_cands.flatMap(lambda x: x.items()).reduceByKey(
-            lambda acc, val: _merge_result(acc, val)).collect() #.collectAsMap()
+            lambda acc, val: _merge_result(acc, val)).collectAsMap()
     if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_dict))
 
     _store_similar_cands_redis(similar_dict)
@@ -173,7 +175,7 @@ def main():
     start_time = time.time()
     df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED) # load historical data
     mh, lsh = load_mh_lsh()
-    compute_minhash_lsh(df, mh, lsh) # Compute MinHash/LSH hashes for historical news
+    #compute_minhash_lsh(df, mh, lsh) # Compute MinHash/LSH hashes for historical news
 
     # Compute pairwise LSH similarities for news within tags
     if (config.LOG_DEBUG): print("[BATCH]: Fetching questions,comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
