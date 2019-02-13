@@ -57,28 +57,36 @@ def generate_tag(input_string):
 
 def store_preprocessed_redis(df):
     # Store news data
+    # def helper(iterator):
+    #     """
+    #     # here is a naive implementation. another option is to use the spark-redis package as following:
+    #     # df.write.format("org.apache.spark.sql.redis").option("table", "people").option("key.column", "name").save()
+    #     # loadedDf = spark.read.format("org.apache.spark.sql.redis").option("table", "people").load()
+    #     # loadedDf.show()
+    #
+    #     fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
+    #     """
+    #     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    #     for news in iterator:
+    #         save_content = news[:2]+news[4:6]+news[9:10]
+    #         if config.LOG_DEBUG: print(save_content)
+    #         try:
+    #             #rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(news_dict['timestamp']), json.dumps(news_dict))
+    #             rdb.zadd("preprocessed:{0}".format(news[0]), long(news[-2]), save_content)
+    #             #rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+    #         except Exception as e:
+    #             print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news[0]))
+    # df.rdd.map(list).foreachPartition(helper)
     def helper(iterator):
-        """
-        # here is a naive implementation. another option is to use the spark-redis package as following:
-        # df.write.format("org.apache.spark.sql.redis").option("table", "people").option("key.column", "name").save()
-        # loadedDf = spark.read.format("org.apache.spark.sql.redis").option("table", "people").load()
-        # loadedDf.show()
-
-        fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
-        """
         rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
         for news in iterator:
-            #news_dict = dict((k, v) for k, v in zip(fields, news))
-            #if config.LOG_DEBUG:
-                #print(news)
-                #print("id:{0} - headline:{1}".format(news[0], news[1]))
+            save_content = [news.id, news.headline, news.text_body_stemmed, news.timestamp]
+            if config.LOG_DEBUG: print(save_content)
             try:
-                #rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(news_dict['timestamp']), json.dumps(news_dict))
-                rdb.zadd("preprocessed", int(news[-2]), news[:2]+news[4:6]+news[9:10])
-                #rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+                rdb.zadd("preprocessed:{0}".format(news.id), long(news.timestamp), save_content)
             except Exception as e:
-                print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news[0]))
-    df.rdd.map(list).foreachPartition(helper)
+                print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news.id))
+    df.foreachPartition(helper)
 
 
 def df_preprocess_func(df):
