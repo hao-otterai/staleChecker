@@ -56,14 +56,11 @@ def process_mini_batch(rdd, input_schema):
 
     # preprocess
     df_preprocessed = preprocess.df_preprocess_func(df)
-
     # calculate CustomMinHashLSH
     df_with_hash_sig = batch_process.compute_minhash_lsh(df_preprocessed, mh, lsh)
-
     # iterate over the news in each partition
     def _process_news_iter(iter):
         for news in iter: process_news(news)
-
     df_with_hash_sig.foreachPartition(_process_news_iter)
 
 
@@ -88,8 +85,8 @@ def process_news(news):
     tq = []
     for tag in tags:
         #tq += rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
-        tq += rdb.zrangebyscore("lsh:{0}".format(tag), int(tags['display_timestamp'])-config.TIME_WINDOW,
-                                int(tags['display_timestamp']), withscores=False)
+        tq += rdb.zrangebyscore("lsh:{0}".format(tag), int(tags['timestamp'])-config.TIME_WINDOW,
+                                int(tags['timestamp']), withscores=False)
     df = sql_context.read.json(sc.parallelize(tq))
 
     udf_num_common_buckets = udf(lambda x: util.intersection(x, news['lsh_hash']), IntegerType())
@@ -97,7 +94,7 @@ def process_news(news):
     df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
             col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT).withColumn(
             'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
-            col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD).orderby()
+            col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
 
     if config.LOG_DEBUG:
         cnt = df.count()
@@ -120,11 +117,12 @@ def process_news(news):
 
     def save_dup_to_redis(iter, news):
         rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-        token = "dup_cand:{}".format((news['id'], news['headline'], news['timestamp']))
+        token = "dup_cand:{}".format(tuple(news['id'], news['headline'], news['timestamp']))
         for entry in iter:
-            cand_reformatted = (tag, q_id, entry["id"], entry["headline"], entry["headline"], news["timestamp"])
-            print("Found candidate: {0}".format(cand_reformatted))
-            rdb.zadd("dup_cand", mh_comparison, cand_reformatted)
+            dup = tuple(entry.id, entry.headline, entry.timestamp)
+            if config.LOG_DEBUG:
+                print("Found candidate: {0}".format(dup))
+            rdb.zadd(token, entry.jaccard_sim, dup)
 
     df.foreachPartition(lambda iter: save_dup_to_redis(iter, news))
 

@@ -62,7 +62,7 @@ def store_preprocessed_news_redis(iterator):
     # loadedDf = spark.read.format("org.apache.spark.sql.redis").option("table", "people").load()
     # loadedDf.show()
 
-    fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, display_timestamp, djn_urgency"
+    fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
     """
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for news in iterator:
@@ -71,7 +71,7 @@ def store_preprocessed_news_redis(iterator):
             #print(news)
             #print("id:{0} - headline:{1}".format(news[0], news[1]))
         try:
-            #rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(news_dict['display_timestamp']), json.dumps(news_dict))
+            #rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(news_dict['timestamp']), json.dumps(news_dict))
             rdb.zadd("preprocessed_news", int(news[-2]), news[:2]+news[5:])
             #rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
         except Exception as e:
@@ -110,7 +110,7 @@ def df_preprocess_func(df):
     df_stemmed = df_stemmed0.withColumn("text_body_stemmed", final_len_filter("text_body_stemmed0"))
 
     # Timestamp
-    final_data = df_stemmed.withColumn("display_timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
+    final_data = df_stemmed.withColumn("timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
 
     # Shingle resulting body
     # if (config.LOG_DEBUG): print("[PROCESSING] Shingling resulting text body...")
@@ -143,7 +143,7 @@ def df_preprocess_func(df):
 # Preprocess a data file and upload it
 def main_preprocess_file(bucket_name, file_name):
 
-    final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, display_timestamp, djn_urgency"
+    final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
     # tag_industry, tag_market,
 
     df_raw = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))

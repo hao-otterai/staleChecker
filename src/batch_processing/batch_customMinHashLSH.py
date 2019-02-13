@@ -54,10 +54,10 @@ def compute_minhash_lsh(df, mh, lsh):
         if config.LOG_DEBUG: print("store minhash and lsh by company tag")
         for q in rdd:
             q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
-                        "lsh_hash": q.lsh_hash, "timestamp": q.display_timestamp })
+                        "lsh_hash": q.lsh_hash, "timestamp": q.timestamp })
             try:
                 for tag in q.tag_company:
-                    rdb.zadd("lsh:{0}".format(tag), q.display_timestamp, q_json)
+                    rdb.zadd("lsh:{0}".format(tag), q.timestamp, q_json)
                     rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
             except Exception as e:
                 print("ERROR: failed to save tag {0} to Redis".format(tag))
@@ -142,21 +142,26 @@ def find_similar_cands_per_tag(tag, mh, lsh):
                 # Store by jaccard_sim_score
                 rdb.zadd(token, sim[0], val)
 
-    rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'),
-        col('timestamp'), col('lsh_hash')).rdd.flatMap(
-        lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])])
-                for band, hash in enumerate(x[4]))).reduceByKey(
-        lambda a, b: _custom_extend(a,b)).filter(lambda x: len(x[1])>1).map(lambda x: tuple(x[1]))
-    #if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_common_bucket.collect()))
+    try:
+        rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'),
+            col('timestamp'), col('lsh_hash')).rdd.flatMap(
+            lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])])
+                    for band, hash in enumerate(x[4]))).reduceByKey(
+            lambda a, b: _custom_extend(a,b)).filter(lambda x: len(x[1])>1).map(lambda x: tuple(x[1]))
+        #if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_common_bucket.collect()))
 
-    rdd_cands = rdd_common_bucket.map(lambda cand_set: get_jaccard_similarity(cand_set))
-    #if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_cands.first()))
+        rdd_cands = rdd_common_bucket.map(lambda cand_set: get_jaccard_similarity(cand_set))
+        #if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_cands.first()))
 
-    similar_dict = rdd_cands.flatMap(lambda x: x.items()).reduceByKey(
-            lambda acc, val: _merge_result(acc, val)).collectAsMap()
-    if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_dict))
+        similar_dict = rdd_cands.flatMap(lambda x: x.items()).reduceByKey(
+                lambda acc, val: _merge_result(acc, val)).collectAsMap()
+        if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_dict))
+        _store_similar_cands_redis(similar_dict)
 
-    _store_similar_cands_redis(similar_dict)
+    except Exception as e:
+        print("error getting similar news for tag {}".format(tag), e )
+
+
 
 
 def main():
