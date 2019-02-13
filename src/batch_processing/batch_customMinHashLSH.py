@@ -180,7 +180,7 @@ def main():
     start_time = time.time()
     df = util.read_all_json_from_bucket(sql_context, config.S3_BUCKET_BATCH_PREPROCESSED) # load historical data
     mh, lsh = load_mh_lsh()
-    #compute_minhash_lsh(df, mh, lsh) # Compute MinHash/LSH hashes for historical news
+    compute_minhash_lsh(df, mh, lsh) # Compute MinHash/LSH hashes for historical news
 
     # Compute pairwise LSH similarities for news within tags
     if (config.LOG_DEBUG): print("[BATCH]: Fetching questions,comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
