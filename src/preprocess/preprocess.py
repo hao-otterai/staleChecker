@@ -80,10 +80,11 @@ def store_preprocessed_redis(df):
     def helper(iterator):
         rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
         for news in iterator:
+            token = "preprocessed:{0}".format(news.id)
             save_content = [news.id, news.headline, news.text_body_stemmed, news.timestamp]
-            if config.LOG_DEBUG: print(save_content)
+            #if config.LOG_DEBUG: print(save_content)
             try:
-                rdb.zadd("preprocessed:{0}".format(news.id), long(news.timestamp), save_content)
+                rdb.set(token, save_content)
             except Exception as e:
                 print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news.id))
     df.foreachPartition(helper)
@@ -171,7 +172,7 @@ def main_preprocess_file(bucket_name, file_name):
         print(df_preprocessed.first())
 
     # write to Redis
-    if config.LOG_DEBUG: print("store preprocessed news by timestamp (latest first)")
+    if config.LOG_DEBUG: print("store preprocessed news")
     store_preprocessed_redis(df_preprocessed) #final_output_fields.split(',')
 
     # Write to AWS
