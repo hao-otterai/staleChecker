@@ -10,7 +10,7 @@ from pyspark.sql.types import ArrayType, StringType
 from pyspark.sql.functions import udf, concat, col, lit, unix_timestamp
 
 from pyspark.ml.feature import StopWordsRemover, Tokenizer
-from pyspark.ml.feature import HashingTF, IDF, VectorAssembler
+#from pyspark.ml.feature import HashingTF, IDF, VectorAssembler
 
 import nltk
 #nltk.download("wordnet") # only need to download once

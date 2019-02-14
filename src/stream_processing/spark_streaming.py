@@ -19,6 +19,11 @@ from pyspark.sql import SQLContext
 from pyspark.sql import SparkSession
 from pyspark.sql.types import *
 
+from pyspark.sql.types import ArrayType, StringType
+from pyspark.sql.functions import udf, concat, col, lit, unix_timestamp
+
+from pyspark.ml.feature import StopWordsRemover, Tokenizer
+
 import config
 import util
 import locality_sensitive_hash
