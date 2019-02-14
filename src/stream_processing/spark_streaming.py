@@ -33,8 +33,11 @@ def getSparkSessionInstance(sparkConf):
 
 
 def conver_rdd_to_df(rdd, input_schema):
-    print("==== Converting RDD[json] to DataFrame ====")
+    start_time = time.time()
+    if config.LOG_DEBUG: print("==== Converting RDD[json] to DataFrame ====")
     spark = getSparkSessionInstance(rdd.context.getConf())
+    end_time = time.time()
+    if config.LOG_DEBUG: print("conver_rdd_to_df run time (seconds): {0} seconds".format(end_time - start_time))
     return  spark.createDataFrame(rdd, input_schema)
 
 
@@ -50,7 +53,8 @@ def process_mini_batch(rdd, input_schema, mh, lsh):
         # calculate CustomMinHashLSH
         df_with_hash_sig = batch_process.compute_minhash_lsh(df_preprocessed, mh, lsh)
         # iterate over the news in each partition
-        df_with_hash_sig.foreachPartition(process_news)
+        if not df_with_hash_sig.isEmpty():
+            df_with_hash_sig.foreachPartition(process_news)
 
 
 
