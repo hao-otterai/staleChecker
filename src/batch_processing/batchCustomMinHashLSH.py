@@ -64,7 +64,7 @@ def compute_minhash_lsh(df, mh, lsh):
 
     #if config.LOG_DEBUG: print(df.first())
     df.foreachPartition(store_lsh_redis_by_tag)
-    #return df
+    return df
 
 
 

@@ -53,17 +53,19 @@ def process_mini_batch(rdd, input_schema, mh, lsh):
         # preprocess
         df_preprocess = preprocess.df_preprocess_func(df)
         # Extract data that we want
-        df_preprocess.registerTempTable("final_data")
-        final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
+        df_preprocess.registerTempTable("df_preprocess")
+        _output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
 
         global sql_context
-        df_preprocess = sql_context.sql( "SELECT {} from final_data".format(final_output_fields) )
+        df_preprocess_final = sql_context.sql( "SELECT {} from df_preprocess".format(_output_fields) )
 
         # calculate CustomMinHashLSH
-        df_with_hash_sig = batch_process.compute_minhash_lsh(df_preprocess, mh, lsh)
-        # iterate over the news in each partition
-        #if not df_with_hash_sig.isEmpty():
+        df_with_hash_sig = batch_process.compute_minhash_lsh(df_preprocess_final, mh, lsh)
+
+        # try:
         df_with_hash_sig.foreachPartition(process_news)
+        # except Exception as e:
+        #     print("process_mini_batch error: ", e)
 
 
 
