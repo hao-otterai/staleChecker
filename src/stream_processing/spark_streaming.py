@@ -31,6 +31,14 @@ import min_hash
 import preprocess
 import batchCustomMinHashLSH as batch_process
 
+global mh, lsh
+mh, lsh = load_mh_lsh()
+
+# schema for converting input news stream RDD[json] to DataFrame
+global input_schema
+input_schema = StructType([StructField(field, StringType(), nullable = True) for field in config.INPUT_SCHEMA_FIELDS])
+
+
 
 # Lazily instantiated global instance of SparkSession
 def getSparkSessionInstance(sparkConf):
@@ -46,6 +54,7 @@ def conver_rdd_to_df(rdd, input_schema):
     end_time = time.time()
     if config.LOG_DEBUG: print("conver_rdd_to_df run time (seconds): {0} seconds".format(end_time - start_time))
     return  spark.createDataFrame(rdd, input_schema)
+
 
 def load_mh_lsh():
     #  Create and save MinHash and LSH if not exist or load them from file
@@ -80,7 +89,7 @@ def store_lsh_redis_by_tag(rdd):
 
 
 
-def compute_minhash_lsh(df, mh, lsh):
+def compute_minhash_lsh(df):
     calc_min_hash = udf(lambda x: list(map(lambda x: int(x), mh.calc_min_hash_signature(x))), ArrayType(IntegerType()))
     calc_lsh_hash = udf(lambda x: list(map(lambda x: int(x), lsh.find_lsh_buckets(x))), ArrayType(IntegerType()))
 
@@ -90,6 +99,52 @@ def compute_minhash_lsh(df, mh, lsh):
     #if config.LOG_DEBUG: print(df.first())
     #df.foreachPartition(store_lsh_redis_by_tag)
     return df
+
+
+
+def test_func(rdd):
+    df = conver_rdd_to_df(rdd, input_schema)
+    if config.LOG_DEBUG: print(df.first())
+    df_preprocess = preprocess.df_preprocess_func(df)
+    df_with_hash_sig = compute_minhash_lsh(df_preprocess)
+
+    def helper(iter, news):
+        rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+        token = "dup_cand:{}".format(news.id)
+        for entry in iter:
+            processed_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+            dup = tuple(news.headline, news.timestamp, entry.id, entry.headline,
+                            entry.timestamp, entry.ingest_timestamp, processed_timestamp)
+            rdb.zadd(token, entry.jaccard_sim, dup)
+
+    for news in df_with_hash_sig:
+        try:
+            if len(news)>0:
+                rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+                # tags = news["tag_company"]
+                tq = []
+                for tag in news.tag_company:
+                    #tq += rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
+                    tq += rdb.zrangebyscore("lsh:{0}".format(tag), long(news.timestamp)-config.TIME_WINDOW,
+                                            long(news.timestamp), withscores=False)
+                tq = list(set(tq))
+                df = sql_context.read.json(sc.parallelize(tq))
+
+                udf_num_common_buckets = udf(lambda x: util.intersection(x, news.lsh_hash), IntegerType())
+                udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, news.min_hash), FloatType())
+                df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
+                        col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT).withColumn(
+                        'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
+                        col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+
+                if config.LOG_DEBUG:
+                    df.count().map(lambda x: "{} similar news found".format(x))
+
+                # # Store similar candidates in Redis
+                df.foreachPartition(lambda iter: helper(iter, news))
+        except Exception as e:
+            print(e)
+
 
 
 
@@ -200,11 +255,8 @@ def main():
     if config.LOG_DEBUG:
         count_mini_batch = dstream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
 
-    mh, lsh = load_mh_lsh()
-
-    # schema for converting input news stream RDD[json] to DataFrame
-    input_schema = StructType([StructField(field, StringType(), nullable = True) for field in config.INPUT_SCHEMA_FIELDS])
-    dstream.foreachRDD(lambda rdd: process_mini_batch(rdd, input_schema, mh, lsh))
+    #dstream.foreachRDD(lambda rdd: process_mini_batch(rdd, input_schema, mh, lsh))
+    dstream.foreachRDD(lambda rdd: rdd.foreachPartition(test_func))
 
     ssc.start()
     ssc.awaitTermination()
