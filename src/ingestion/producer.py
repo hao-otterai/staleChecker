@@ -17,7 +17,9 @@ class Producer(threading.Thread):
                     api_version=(0, 10))
 
         file_dir = "/home/ubuntu/staleChecker/src/ingestion/2001_sample_10M_stream_pre.json"
-        with open(file_dir) as f: json_file = json.load(f)
+        json_file = sql_context.read.json(file_dir).collect()
+        #with open(file_dir) as f: json_file = json.load(f)
+
         for line in json_file:
             if config.LOG_DEBUG: print(line)
             producer.send(config.KAFKA_TOPIC, line)
@@ -27,6 +29,12 @@ def main():
     producer = Producer()
     producer.start()
     print("Starting Kafka Producer...")
+
+    spark_conf = SparkConf().setAppName("Producer")
+    global sc
+    sc = SparkContext(conf=spark_conf)
+    global sql_context
+    sql_context = SQLContext(sc)
 
 if __name__ == "__main__":
     main()
