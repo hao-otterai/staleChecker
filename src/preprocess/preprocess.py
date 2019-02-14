@@ -87,6 +87,8 @@ def store_preprocessed_redis(iterator):
     # df.rdd.map(list).foreachPartition(helper)
 
 def df_preprocess_func(df):
+    #global sql_context
+
     final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
     # tag_industry, tag_market,
 
@@ -152,7 +154,7 @@ def df_preprocess_func(df):
 
 # Preprocess a data file and upload it
 def preprocess_file(bucket_name, file_name):
-
+    #global sql_context
 
     df_raw = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
     if (config.LOG_DEBUG):

@@ -121,6 +121,9 @@ def main():
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/preprocess/preprocess.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/batch_processing/batchCustomMinHashLSH.py")
 
+    global sql_context
+    sql_context = SQLContext(sc)
+
     global ssc
     ssc = StreamingContext(sc, config.SPARK_STREAMING_MINI_BATCH_WINDOW)
     #ssc.checkpoint("_spark_streaming_checkpoint")
