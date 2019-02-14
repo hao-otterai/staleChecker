@@ -87,6 +87,9 @@ def store_preprocessed_redis(iterator):
     # df.rdd.map(list).foreachPartition(helper)
 
 def df_preprocess_func(df):
+    final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
+    # tag_industry, tag_market,
+
     # Clean body
     clean_body = udf(lambda body: filter_body(body), StringType())
     df_cleaned = df.withColumn("cleaned_body", clean_body("body"))
@@ -117,6 +120,10 @@ def df_preprocess_func(df):
     # Timestamp
     final_data = df_stemmed.withColumn("timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
 
+    # Extract data that we want
+    final_data.registerTempTable("final_data")
+    return sql_context.sql( "SELECT {} from final_data".format(final_output_fields) )
+
     # Shingle resulting body
     # if (config.LOG_DEBUG): print("[PROCESSING] Shingling resulting text body...")
     # shingle = udf(lambda tokens: get_two_gram_shingles(tokens), ArrayType(ArrayType(StringType())))
@@ -140,33 +147,25 @@ def df_preprocess_func(df):
     #         vdf = vectorizer.transform(htf_df)
     #     final_data = vdf
     #     final_output_fields += ", text_body_tokenized "
-    return final_data
+
 
 
 # Preprocess a data file and upload it
 def preprocess_file(bucket_name, file_name):
 
-    final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
-    # tag_industry, tag_market,
 
     df_raw = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
-    if (config.LOG_DEBUG): df_raw.printSchema()
-
-    final_data = df_preprocess_func(df_raw)
-
-    # Extract data that we want
-    final_data.registerTempTable("final_data")
-    df_preprocessed = sql_context.sql( "SELECT {} from final_data".format(final_output_fields) )
-
     if (config.LOG_DEBUG):
-        print('Schema of transformed input data')
-        df_preprocessed.printSchema()
+        df_raw.printSchema()
 
-        print('Fields to output for final_data:', final_output_fields)
+    df_preprocessed = df_preprocess_func(df_raw)
+    if (config.LOG_DEBUG):
+        df_preprocessed.printSchema()
         print(df_preprocessed.first())
 
     # write to Redis
-    if config.LOG_DEBUG: print("store preprocessed news")
+    if config.LOG_DEBUG:
+        print("store preprocessed news")
     df_preprocessed.foreachPartition(store_preprocessed_redis)
 
     # Write to AWS

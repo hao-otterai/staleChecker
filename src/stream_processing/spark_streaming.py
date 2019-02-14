@@ -49,12 +49,12 @@ def process_mini_batch(rdd, input_schema, mh, lsh):
         if config.LOG_DEBUG: print(df.first())
 
         # preprocess
-        df_preprocessed = preprocess.df_preprocess_func(df)
+        df_preprocess = preprocess.df_preprocess_func(df)
         # calculate CustomMinHashLSH
-        df_with_hash_sig = batch_process.compute_minhash_lsh(df_preprocessed, mh, lsh)
+        df_with_hash_sig = batch_process.compute_minhash_lsh(df_preprocess, mh, lsh)
         # iterate over the news in each partition
-        if not df_with_hash_sig.isEmpty():
-            df_with_hash_sig.foreachPartition(process_news)
+        #if not df_with_hash_sig.isEmpty():
+        df_with_hash_sig.foreachPartition(process_news)
 
 
 
