@@ -42,6 +42,51 @@ def conver_rdd_to_df(rdd, input_schema):
     if config.LOG_DEBUG: print("conver_rdd_to_df run time (seconds): {0} seconds".format(end_time - start_time))
     return  spark.createDataFrame(rdd, input_schema)
 
+def load_mh_lsh():
+    #  Create and save MinHash and LSH if not exist or load them from file
+    if(not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
+        mh = min_hash.MinHash(config.MIN_HASH_K_VALUE)
+        lsh = locality_sensitive_hash.LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
+        print('saving mh, lsh to file {}, {}'.format(config.MIN_HASH_PICKLE, config.LSH_PICKLE))
+        util.save_pickle_file(mh, config.MIN_HASH_PICKLE)
+        util.save_pickle_file(lsh, config.LSH_PICKLE)
+    else:
+        if config.LOG_DEBUG: print('loading mh and lsh from local files')
+        mh = util.load_pickle_file(config.MIN_HASH_PICKLE)
+        lsh = util.load_pickle_file(config.LSH_PICKLE)
+    if config.LOG_DEBUG: print('mh and lsh init finished')
+    return mh, lsh
+
+
+
+# Store news data
+def store_lsh_redis_by_tag(rdd):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    if config.LOG_DEBUG: print("store minhash and lsh by company tag")
+    for q in rdd:
+        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
+                    "lsh_hash": q.lsh_hash, "timestamp": q.timestamp })
+        try:
+            for tag in q.tag_company:
+                rdb.zadd("lsh:{0}".format(tag), q.timestamp, q_json)
+                rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+        except Exception as e:
+            print("ERROR: failed to save tag {0} to Redis".format(tag))
+
+
+
+def compute_minhash_lsh(df, mh, lsh):
+    calc_min_hash = udf(lambda x: list(map(lambda x: int(x), mh.calc_min_hash_signature(x))), ArrayType(IntegerType()))
+    calc_lsh_hash = udf(lambda x: list(map(lambda x: int(x), lsh.find_lsh_buckets(x))), ArrayType(IntegerType()))
+
+    df = df.withColumn("min_hash", calc_min_hash("text_body_stemmed"))
+    df = df.withColumn("lsh_hash", calc_lsh_hash("min_hash"))
+
+    #if config.LOG_DEBUG: print(df.first())
+    #df.foreachPartition(store_lsh_redis_by_tag)
+    return df
+
+
 
 def process_mini_batch(rdd, input_schema, mh, lsh):
     if not rdd.isEmpty():
@@ -52,15 +97,15 @@ def process_mini_batch(rdd, input_schema, mh, lsh):
 
         # preprocess
         df_preprocess = preprocess.df_preprocess_func(df)
-        # Extract data that we want
-        df_preprocess.registerTempTable("df_preprocess")
-        _output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
-
-        global sql_context
-        df_preprocess_final = sql_context.sql( "SELECT {} from df_preprocess".format(_output_fields) )
 
         # calculate CustomMinHashLSH
-        df_with_hash_sig = batch_process.compute_minhash_lsh(df_preprocess_final, mh, lsh)
+        df_with_hash_sig = compute_minhash_lsh(df_preprocess, mh, lsh)
+
+        # # Extract data that we want
+        # df_preprocess.registerTempTable("df_preprocess")
+        # _output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
+        # global sql_context
+        # df_preprocess_final = sql_context.sql( "SELECT {} from df_preprocess".format(_output_fields) )
 
         # try:
         df_with_hash_sig.foreachPartition(process_news)
@@ -115,6 +160,9 @@ def process_news(iter):
         except Exception as e:
             print(e)
 
+
+
+
 def main():
 
     spark_conf = SparkConf().setAppName("Spark Streaming MinHashLSH")
@@ -147,11 +195,10 @@ def main():
     if config.LOG_DEBUG:
         count_mini_batch = dstream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
 
-    mh, lsh = batch_process.load_mh_lsh()
+    mh, lsh = load_mh_lsh()
 
     # schema for converting input news stream RDD[json] to DataFrame
-    input_schema = StructType([StructField(field, StringType(), nullable = True)
-                        for field in config.INPUT_SCHEMA_FIELDS])
+    input_schema = StructType([StructField(field, StringType(), nullable = True) for field in config.INPUT_SCHEMA_FIELDS])
     dstream.foreachRDD(lambda rdd: process_mini_batch(rdd, input_schema, mh, lsh))
 
     ssc.start()
