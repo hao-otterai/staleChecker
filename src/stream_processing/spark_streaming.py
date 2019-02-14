@@ -76,7 +76,7 @@ def compute_minhash_lsh(df):
     return df
 
 
-de test_process_mini_batch(rdd, input_schema, mh, lsh):
+def test_process_mini_batch(rdd, input_schema, mh, lsh):
     for news in rdd:
         if len(news) > 0:
             test_func(news, input_schema, mh, lsh)
