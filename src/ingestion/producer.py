@@ -10,6 +10,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/
 import config
 import util
 
+from pyspark import SparkContext
+from pyspark.conf import SparkConf
+from pyspark.sql import SQLContext
+# from pyspark.streaming import StreamingContext
+# from pyspark.streaming.kafka import KafkaUtils
+
+
 class Producer(threading.Thread):
     def run(self):
         producer = kafka.KafkaProducer(bootstrap_servers=config.KAFKA_SERVERS,
