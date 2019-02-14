@@ -5,4 +5,5 @@
 # src/batch_processing/batchCustomMinHashLSH.py
 
 # local
-spark-submit --executor-memory 6G src/batch_processing/batchCustomMinHashLSH.py
+spark-submit --master spark://ip-10-0-0-10.us-west-2.compute.internal:7077 \
+--executor-memory 6G src/batch_processing/batchCustomMinHashLSH.py
