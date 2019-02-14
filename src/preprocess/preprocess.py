@@ -13,7 +13,7 @@ from pyspark.ml.feature import StopWordsRemover, Tokenizer
 from pyspark.ml.feature import HashingTF, IDF, VectorAssembler
 
 import nltk
-nltk.download("wordnet") # only need to download once
+#nltk.download("wordnet") # only need to download once
 from nltk.stem import WordNetLemmatizer
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
