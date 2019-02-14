@@ -84,7 +84,7 @@ def get_jaccard_similarity(candidate_set):
             continue
 
         #calculate jaccard similarity and update redis cache
-        jaccard_sim_token = 'jaccard_sim:{}:{}'.format(_b_set[0], _s_set[0])
+        jaccard_sim_token = 'jacc_sim:{}:{}'.format(_b_set[0], _s_set[0])
         _jaccard_similarity = rdb.get(jaccard_sim_token)
         if _jaccard_similarity is None:
             _jaccard_similarity = util.jaccard_sim_score(_b_set[1], _s_set[1])
@@ -136,11 +136,10 @@ def find_similar_cands_per_tag(tag, mh, lsh):
         """
         rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
         for cand in similar_dict:
-            token = "dup_cand:{}".format(cand[0])
             for sim in similar_dict[cand]:
-                val = (cand[1], cand[2], sim[1])
-                # Store by jaccard_sim_score
-                rdb.zadd(token, sim[0], val)
+                val = tuple(cand[1:] + sim[1])
+                # Store order by jaccard_sim_score
+                rdb.zadd("dup_cand:{}".format(cand[0]), sim[0], val)
 
     try:
         rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'),

@@ -53,18 +53,17 @@ def get_tri_gram_shingles(tokens):
 def generate_tag(input_string):
     return input_string.replace('/','_').split(";") if len(input_string)>0 else ['<UNS>']
 
-
-
 def store_preprocessed_redis(iterator):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for news in iterator:
         #token = "preprocessed:{0}".format(news.id)
-        save_content = [news.id, news.headline, news.text_body_stemmed, news.timestamp]
-        if config.LOG_DEBUG: print(save_content)
+        save_content = {"headline": news.headline, "body": news.body, "timestamp": news.timestamp} #news.text_body_stemmed
+        if config.LOG_DEBUG: print(save_content['headline'])
         try:
-            rdb.zadd("preprocessed", news.timestamp, save_content)
+            rdb.zadd("newsId", news.timestamp, news.id)
+            rdb.hmset("news:{}".format(news.id), save_content)
         except Exception as e:
-            print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news.id))
+            print("ERROR: failed to save news id:{0} to Redis".format(news.id))
     # Store news data
     # def helper(iterator):
     #     """
@@ -144,10 +143,8 @@ def df_preprocess_func(df):
     return final_data
 
 
-
-
 # Preprocess a data file and upload it
-def main_preprocess_file(bucket_name, file_name):
+def preprocess_file(bucket_name, file_name):
 
     final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
     # tag_industry, tag_market,
@@ -191,7 +188,7 @@ def main():
     start_time = time.time()
     bucket = util.get_bucket(config.S3_BUCKET_BATCH_RAW)
     for csv_obj in bucket.objects.all():
-        main_preprocess_file(config.S3_BUCKET_BATCH_RAW, csv_obj.key)
+        preprocess_file(config.S3_BUCKET_BATCH_RAW, csv_obj.key)
         print("Finished preprocessing file s3a://{0}/{1}".format(config.S3_BUCKET_BATCH_RAW, csv_obj.key))
 
     end_time = time.time()
