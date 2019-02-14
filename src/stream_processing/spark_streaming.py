@@ -38,27 +38,24 @@ def conver_rdd_to_df(rdd, input_schema):
     return  spark.createDataFrame(rdd, input_schema)
 
 
-def process_mini_batch(rdd, input_schema):
-    if rdd.isEmpty():
-        print('rdd is empty')
-        return
+def process_mini_batch(rdd, input_schema, mh, lsh):
+    if not rdd.isEmpty():
+        # convert dstream RDD to DataFrame. This is necessary for the preprocessing
+        # which involves transform operations using MLlib
+        df = conver_rdd_to_df(rdd, input_schema)
+        if config.LOG_DEBUG:
+            df.printSchema()
+            print(df.first())
 
-    # Create and save MinHash and LSH or load them from file
-    mh, lsh = batch_process.load_mh_lsh()
-
-    # convert dstream RDD to DataFrame. This is necessary for the preprocessing
-    # which involves transform operations using MLlib
-    df = conver_rdd_to_df(rdd, input_schema)
-    if config.LOG_DEBUG:
-        df.printSchema()
-        print(df.first())
-
-    # preprocess
-    df_preprocessed = preprocess.df_preprocess_func(df)
-    # calculate CustomMinHashLSH
-    df_with_hash_sig = batch_process.compute_minhash_lsh(df_preprocessed, mh, lsh)
-    # iterate over the news in each partition
-    df_with_hash_sig.foreachPartition(process_news)
+        try:
+            # preprocess
+            df_preprocessed = preprocess.df_preprocess_func(df)
+            # calculate CustomMinHashLSH
+            df_with_hash_sig = batch_process.compute_minhash_lsh(df_preprocessed, mh, lsh)
+            # iterate over the news in each partition
+            df_with_hash_sig.foreachPartition(process_news)
+        except Exception as e:
+            print(e)
 
 
 def process_news(iter):
@@ -141,11 +138,14 @@ def main():
     if config.LOG_DEBUG:
         count_mini_batch = dstream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
 
+    # Create and save MinHash and LSH or load them from file
+    mh, lsh = batch_process.load_mh_lsh()
+
     # preprocess the news
     # schema for converting input news stream RDD[json] to DataFrame
     input_schema = StructType([StructField(field, StringType(), nullable = True)
                         for field in config.INPUT_SCHEMA_FIELDS])
-    dstream.foreachRDD(lambda rdd: process_mini_batch(rdd, input_schema))
+    dstream.foreachRDD(lambda rdd: process_mini_batch(rdd, input_schema, mh, lsh))
 
     ssc.start()
     ssc.awaitTermination()
