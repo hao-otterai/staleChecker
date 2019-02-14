@@ -87,10 +87,6 @@ def store_preprocessed_redis(iterator):
     # df.rdd.map(list).foreachPartition(helper)
 
 def df_preprocess_func(df):
-    #global sql_context
-
-    final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
-    # tag_industry, tag_market,
 
     # Clean body
     clean_body = udf(lambda body: filter_body(body), StringType())
@@ -122,9 +118,7 @@ def df_preprocess_func(df):
     # Timestamp
     final_data = df_stemmed.withColumn("timestamp",unix_timestamp("display_date", "yyyyMMdd'T'HHmmss.SSS'Z'"))
 
-    # Extract data that we want
-    final_data.registerTempTable("final_data")
-    return sql_context.sql( "SELECT {} from final_data".format(final_output_fields) )
+    return final_data
 
     # Shingle resulting body
     # if (config.LOG_DEBUG): print("[PROCESSING] Shingling resulting text body...")
@@ -154,13 +148,20 @@ def df_preprocess_func(df):
 
 # Preprocess a data file and upload it
 def preprocess_file(bucket_name, file_name):
-    #global sql_context
+    global sql_context
 
     df_raw = sql_context.read.json("s3a://{0}/{1}".format(bucket_name, file_name))
     if (config.LOG_DEBUG):
         df_raw.printSchema()
 
-    df_preprocessed = df_preprocess_func(df_raw)
+    final_data = df_preprocess_func(df_raw)
+    # Extract data that we want
+    final_data.registerTempTable("final_data")
+
+    final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
+    # tag_industry, tag_market,
+    df_preprocessed =  sql_context.sql( "SELECT {} from final_data".format(final_output_fields) )
+
     if (config.LOG_DEBUG):
         df_preprocessed.printSchema()
         print(df_preprocessed.first())

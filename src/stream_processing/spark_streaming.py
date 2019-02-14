@@ -52,6 +52,13 @@ def process_mini_batch(rdd, input_schema, mh, lsh):
 
         # preprocess
         df_preprocess = preprocess.df_preprocess_func(df)
+        # Extract data that we want
+        df_preprocess.registerTempTable("final_data")
+        final_output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
+
+        global sql_context
+        df_preprocess = sql_context.sql( "SELECT {} from final_data".format(final_output_fields) )
+
         # calculate CustomMinHashLSH
         df_with_hash_sig = batch_process.compute_minhash_lsh(df_preprocess, mh, lsh)
         # iterate over the news in each partition
@@ -81,10 +88,6 @@ def process_news(iter):
     for news in iter:
         try:
             if len(news)>0:
-                #if config.LOG_DEBUG:
-                #    print("==========print news for testing============")
-                #    print(news)
-
                 rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
                 # tags = news["tag_company"]
                 tq = []
@@ -129,7 +132,6 @@ def main():
     ssc = StreamingContext(sc, config.SPARK_STREAMING_MINI_BATCH_WINDOW)
     #ssc.checkpoint("_spark_streaming_checkpoint")
 
-    # Kafka stream
     kafka_stream = KafkaUtils.createDirectStream( ssc,
                     [config.KAFKA_TOPIC],
                     {"metadata.broker.list": ",".join(config.KAFKA_SERVERS)} )
@@ -138,17 +140,13 @@ def main():
         data["ingest_timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
         return data
 
-    # stream - parse the json
     dstream = kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda x: _ingest_timestamp(x))
 
-    # count the number of news in the stream mini-batch
     if config.LOG_DEBUG:
         count_mini_batch = dstream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
 
-    # Create and save MinHash and LSH or load them from file
     mh, lsh = batch_process.load_mh_lsh()
 
-    # preprocess the news
     # schema for converting input news stream RDD[json] to DataFrame
     input_schema = StructType([StructField(field, StringType(), nullable = True)
                         for field in config.INPUT_SCHEMA_FIELDS])
