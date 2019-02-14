@@ -21,6 +21,7 @@ class Producer(threading.Thread):
         for line in json_file:
             if config.LOG_DEBUG: print(line)
             producer.send(config.KAFKA_TOPIC, line)
+            time.sleep(config.KAFKA_CONSUMER_REFRESH)
 
 def main():
     producer = Producer()

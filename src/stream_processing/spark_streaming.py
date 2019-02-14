@@ -43,10 +43,7 @@ def process_mini_batch(rdd, input_schema, mh, lsh):
         # convert dstream RDD to DataFrame. This is necessary for the preprocessing
         # which involves transform operations using MLlib
         df = conver_rdd_to_df(rdd, input_schema)
-        if config.LOG_DEBUG:
-            df.printSchema()
-            print(df.first())
-
+        if config.LOG_DEBUG: print(df.first())
         try:
             # preprocess
             df_preprocessed = preprocess.df_preprocess_func(df)

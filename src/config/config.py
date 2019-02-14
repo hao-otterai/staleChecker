@@ -22,7 +22,7 @@ KAFKA_SERVERS = ["ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092",
 
 KAFKA_PRODUCER_RATE = 0.2  # seconds
 KAFKA_TOPIC = "dowjones"
-KAFKA_CONSUMER_REFRESH = 0.2  # seconds
+KAFKA_CONSUMER_REFRESH = 0.01  # seconds
 
 
 # Spark settings - streaming, batch
