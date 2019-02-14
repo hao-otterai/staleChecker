@@ -12,6 +12,7 @@ import os
 
 REDIS_SERVER = "ec2-54-189-255-59.us-west-2.compute.amazonaws.com"
 DUP_QUESTION_IDENTIFY_THRESHOLD = 0.6
+DUP_QUESTION_SHOW_THRESHOLD = 0.65
 rdb = redis.StrictRedis(host=REDIS_SERVER, port=6379, db=0)
 
 @app.route('/')
@@ -64,6 +65,14 @@ def format_dup_cand(dc):
 
 
 ''' Routes '''
+@app.route("/allnews")
+def allnews():
+    ids = rdb.zrevrangebyscore("newsId", "+inf", 980000000, withscores=True)
+    dup_cands = [rdb.zrevrangebyscore("dup_cand:{}".format(id[0]), 1.0, DUP_QUESTION_SHOW_THRESHOLD, withscores=True) for id in ids]
+    #dup_cands = [format_dup_cand(dc) for id in ids]
+    return render_template("q_list.html", dup_cands=dup_cands)
+
+
 #@app.route("/")
 @app.route("/candidates")
 def candidates():
