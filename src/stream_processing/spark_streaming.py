@@ -31,12 +31,30 @@ import min_hash
 import preprocess
 import batchCustomMinHashLSH as batch_process
 
-global mh, lsh
-mh, lsh = load_mh_lsh()
 
 # schema for converting input news stream RDD[json] to DataFrame
 global input_schema
 input_schema = StructType([StructField(field, StringType(), nullable = True) for field in config.INPUT_SCHEMA_FIELDS])
+
+
+def load_mh_lsh():
+    #  Create and save MinHash and LSH if not exist or load them from file
+    if(not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
+        mh = min_hash.MinHash(config.MIN_HASH_K_VALUE)
+        lsh = locality_sensitive_hash.LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
+        print('saving mh, lsh to file {}, {}'.format(config.MIN_HASH_PICKLE, config.LSH_PICKLE))
+        util.save_pickle_file(mh, config.MIN_HASH_PICKLE)
+        util.save_pickle_file(lsh, config.LSH_PICKLE)
+    else:
+        if config.LOG_DEBUG: print('loading mh and lsh from local files')
+        mh = util.load_pickle_file(config.MIN_HASH_PICKLE)
+        lsh = util.load_pickle_file(config.LSH_PICKLE)
+    if config.LOG_DEBUG: print('mh and lsh init finished')
+    return mh, lsh
+
+global mh, lsh
+mh, lsh = load_mh_lsh()
+
 
 
 
@@ -56,20 +74,7 @@ def conver_rdd_to_df(rdd, input_schema):
     return  spark.createDataFrame(rdd, input_schema)
 
 
-def load_mh_lsh():
-    #  Create and save MinHash and LSH if not exist or load them from file
-    if(not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
-        mh = min_hash.MinHash(config.MIN_HASH_K_VALUE)
-        lsh = locality_sensitive_hash.LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
-        print('saving mh, lsh to file {}, {}'.format(config.MIN_HASH_PICKLE, config.LSH_PICKLE))
-        util.save_pickle_file(mh, config.MIN_HASH_PICKLE)
-        util.save_pickle_file(lsh, config.LSH_PICKLE)
-    else:
-        if config.LOG_DEBUG: print('loading mh and lsh from local files')
-        mh = util.load_pickle_file(config.MIN_HASH_PICKLE)
-        lsh = util.load_pickle_file(config.LSH_PICKLE)
-    if config.LOG_DEBUG: print('mh and lsh init finished')
-    return mh, lsh
+
 
 
 
