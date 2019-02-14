@@ -3,6 +3,7 @@ import sys
 import redis
 import json
 import datetime
+import time
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages org.apache.spark:spark-streaming-kafka-0-8_2.11:2.2.0 pyspark-shell"
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
