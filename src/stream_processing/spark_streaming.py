@@ -44,15 +44,14 @@ def process_mini_batch(rdd, input_schema, mh, lsh):
         # which involves transform operations using MLlib
         df = conver_rdd_to_df(rdd, input_schema)
         if config.LOG_DEBUG: print(df.first())
-        try:
-            # preprocess
-            df_preprocessed = preprocess.df_preprocess_func(df)
-            # calculate CustomMinHashLSH
-            df_with_hash_sig = batch_process.compute_minhash_lsh(df_preprocessed, mh, lsh)
-            # iterate over the news in each partition
-            df_with_hash_sig.foreachPartition(process_news)
-        except Exception as e:
-            print(e)
+
+        # preprocess
+        df_preprocessed = preprocess.df_preprocess_func(df)
+        # calculate CustomMinHashLSH
+        df_with_hash_sig = batch_process.compute_minhash_lsh(df_preprocessed, mh, lsh)
+        # iterate over the news in each partition
+        df_with_hash_sig.foreachPartition(process_news)
+
 
 
 def process_news(iter):
@@ -74,34 +73,36 @@ def process_news(iter):
             rdb.zadd(token, entry.jaccard_sim, dup)
 
     for news in iter:
-        if len(news)>0:
-            #if config.LOG_DEBUG:
-            #    print("==========print news for testing============")
-            #    print(news)
+        try:
+            if len(news)>0:
+                #if config.LOG_DEBUG:
+                #    print("==========print news for testing============")
+                #    print(news)
 
-            rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-            # tags = news["tag_company"]
-            tq = []
-            for tag in news.tag_company:
-                #tq += rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
-                tq += rdb.zrangebyscore("lsh:{0}".format(tag), long(news.timestamp)-config.TIME_WINDOW,
-                                        long(news.timestamp), withscores=False)
-            tq = list(set(tq))
-            df = sql_context.read.json(sc.parallelize(tq))
+                rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+                # tags = news["tag_company"]
+                tq = []
+                for tag in news.tag_company:
+                    #tq += rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
+                    tq += rdb.zrangebyscore("lsh:{0}".format(tag), long(news.timestamp)-config.TIME_WINDOW,
+                                            long(news.timestamp), withscores=False)
+                tq = list(set(tq))
+                df = sql_context.read.json(sc.parallelize(tq))
 
-            udf_num_common_buckets = udf(lambda x: util.intersection(x, news.lsh_hash), IntegerType())
-            udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, news.min_hash), FloatType())
-            df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
-                    col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT).withColumn(
-                    'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
-                    col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+                udf_num_common_buckets = udf(lambda x: util.intersection(x, news.lsh_hash), IntegerType())
+                udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, news.min_hash), FloatType())
+                df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
+                        col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT).withColumn(
+                        'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
+                        col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
 
-            if config.LOG_DEBUG:
-                df.count().map(lambda x: "{} similar news found".format(x))
+                if config.LOG_DEBUG:
+                    df.count().map(lambda x: "{} similar news found".format(x))
 
-            # # Store similar candidates in Redis
-            df.foreachPartition(lambda iter: helper(iter, news))
-
+                # # Store similar candidates in Redis
+                df.foreachPartition(lambda iter: helper(iter, news))
+        except Exception as e:
+            print(e)
 
 def main():
 
