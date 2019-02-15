@@ -23,7 +23,7 @@ class Producer(threading.Thread):
                     value_serializer=lambda v: json.dumps(v).encode('utf-8'),
                     api_version=(0, 10))
 
-        file_dir = "/home/ubuntu/staleChecker/src/ingestion/2001_sample_10M_stream_pre.json"
+        file_dir = "/home/ubuntu/2001_sample_10M_stream_pre.json"
         #json_file = sql_context.read.json(file_dir).collect()
         with open(file_dir) as f: json_file = json.load(f)
 
