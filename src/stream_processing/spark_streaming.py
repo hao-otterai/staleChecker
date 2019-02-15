@@ -94,23 +94,28 @@ def save2redis(iter, news):
 def process_news(news):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
+    if config.LOG_DEBUG: print('process_news: {}'.format(news))
+
     q_timestamp = long(news['timestamp'])
     q_mh = mh.calc_min_hash_signature(news['text_body_stemmed']) #
     q_lsh = lsh.find_lsh_buckets(q_mh)
     tags = news['tag_company']
 
     # Store tag + news in Redis
+    if config.LOG_DEBUG: print('save news data to Redis')
     q_json = json.dumps({"id": news['id'], "headline": news['headline'], "min_hash": tuple(q_mh),
                         "lsh_hash": tuple(q_lsh), "timestamp": q_timestamp})
     for tag in tags:
         rdb.zadd("lsh:{0}".format(tag), q_timestamp, q_json)
         rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
 
+    if config.LOG_DEBUG: print("get historical news in the same tag(s)")
     tq = []
     for tag in tags:
         tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
     tq = list(set(tq))
     df = sql_context.read.json(sc.parallelize(tq))
+    if config.LOG_DEBUG: df.printSchema()
 
     udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
     udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
@@ -119,8 +124,7 @@ def process_news(news):
             'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
             col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
 
-    if config.LOG_DEBUG:
-        filtered_df.count().map(lambda x: "{} similar news found".format(x))
+    if config.LOG_DEBUG: filtered_df.count().map(lambda x: "{} similar news found".format(x))
 
     filtered_df.foreachPartition(lambda iter: save2redis(iter, news))
 
@@ -173,7 +177,9 @@ def process_news(news):
 
 def process_mini_batch(iter):
     for news in iter:
-        if len(news) > 0: process_news(news)
+        if len(news) > 0:
+            if config.LOG_DEBUG: print('process_mini_batch')
+            process_news(news)
 
 
 
