@@ -56,8 +56,8 @@ def save2redis(iter, news):
     token = "dup_cand:{}".format(news['id']) # id
     for entry in iter:
         processed_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-        dup = tuple(news['headline'], news['timestamp'], entry.id, entry.headline,
-                        entry.timestamp, news['ingest_timestamp'], processed_timestamp)
+        dup = tuple([news['headline'], news['timestamp'], entry.id, entry.headline, entry.timestamp,
+                    news['ingest_timestamp'], processed_timestamp])
         rdb.zadd(token, entry.jaccard_sim, dup)
 
 
