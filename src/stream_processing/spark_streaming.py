@@ -52,12 +52,14 @@ def conver_rdd_to_df(rdd, input_schema):
 
 
 def save2redis(iter, news):
+
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-    token = "dup_cand:{}".format(news['id']) # id
+    token = "dup_cand:{}".format(news['id'])
     for entry in iter:
         processed_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-        dup = tuple([news['headline'], news['timestamp'], entry.id, entry.headline, entry.timestamp,
-                    news['ingest_timestamp'], processed_timestamp])
+        dup = (news['headline'], news['timestamp'], entry.id, entry.headline, entry.timestamp,
+                    news['ingest_timestamp'], processed_timestamp)
+        if config.LOG_DEBUG: print("saving dup_cand to Redis: {}".format(dup))
         rdb.zadd(token, entry.jaccard_sim, dup)
 
 
@@ -65,7 +67,7 @@ def save2redis(iter, news):
 def process_news(news):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
-    if config.LOG_DEBUG: print('process_news: {}'.format(news))
+    #if config.LOG_DEBUG: print('process_news: {}'.format(news))
 
     q_timestamp = long(news['timestamp'])
     q_mh = mh.calc_min_hash_signature(news['text_body_stemmed']) #
@@ -73,21 +75,22 @@ def process_news(news):
     tags = news['tag_company']
 
     # Store tag + news in Redis
-    if config.LOG_DEBUG: print('save news data to Redis')
+
     q_json = json.dumps({"id": news['id'], "headline": news['headline'], "min_hash": tuple(q_mh),
                         "lsh_hash": tuple(q_lsh), "timestamp": q_timestamp})
+    if config.LOG_DEBUG: print('save news data to Redis: {}'.format(q_json))
+
     for tag in tags:
         rdb.zadd("lsh:{0}".format(tag), q_timestamp, q_json)
         rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
 
-    if config.LOG_DEBUG: print("get historical news in the same tag(s)")
+
     tq = []
     for tag in tags:
         tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
+    if config.LOG_DEBUG: print("{} historical news in the same tag(s)".format(len(tq)))
 
     df = sql_context.read.json(sc.parallelize(tq))
-    if config.LOG_DEBUG: df.printSchema()
-
     udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
     udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
     filtered_df = df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
