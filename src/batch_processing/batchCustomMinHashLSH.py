@@ -2,6 +2,7 @@ import sys
 import os
 import time
 import json
+import pickle
 import itertools
 import redis
 
@@ -45,7 +46,7 @@ def store_lsh_redis_by_tag(iter, rdb):
     if config.LOG_DEBUG: print("store minhash and lsh by company tag")
     for q in iter:
         #if config.LOG_DEBUG: print(q)
-        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
+        q_json = pickle.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
                     "lsh_hash": q.lsh_hash, "timestamp": q.timestamp })
 
         #if config.LOG_DEBUG: print(q_json)
