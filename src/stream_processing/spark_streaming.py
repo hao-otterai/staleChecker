@@ -33,6 +33,9 @@ import preprocess
 import batchCustomMinHashLSH as batch_process
 
 
+
+mh, lsh = batch_process.load_mh_lsh()
+
 # Lazily instantiated global instance of SparkSession
 def getSparkSessionInstance(sparkConf):
     if ("sparkSessionSingletonInstance" not in globals()):
@@ -88,7 +91,7 @@ def save2redis(iter, news):
 
 
 
-def process_news(news,  mh, lsh):
+def process_news(news):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
     q_timestamp = long(news['timestamp'])
@@ -169,10 +172,8 @@ def process_news(news,  mh, lsh):
 
 
 def process_mini_batch(iter):
-    mh, lsh = batch_process.load_mh_lsh()
     for news in iter:
-        if len(news) > 0:
-            process_news(news,  mh, lsh)
+        if len(news) > 0: process_news(news)
 
 
 
