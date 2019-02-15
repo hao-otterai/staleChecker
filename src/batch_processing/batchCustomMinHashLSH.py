@@ -44,12 +44,14 @@ def store_lsh_redis_by_tag(rdd):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     if config.LOG_DEBUG: print("store minhash and lsh by company tag")
     for q in rdd:
-        if config.LOG_DEBUG: print(q)
+        #if config.LOG_DEBUG: print(q)
         q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
                     "lsh_hash": q.lsh_hash, "timestamp": q.timestamp })
-        #try:
+
+        if config.LOG_DEBUG: print(q_json)
+
         for tag in q.tag_company:
-            rdb.zadd("lsh:{0}".format(tag), q.timestamp, q_json)
+            rdb.zadd("lsh:{0}".format(tag), long(q.timestamp), q_json)
             rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
         #except Exception as e:
         #    print("ERROR: failed to save tag {0} to Redis".format(tag))
