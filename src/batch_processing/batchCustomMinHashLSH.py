@@ -85,7 +85,6 @@ def get_jaccard_similarity(candidate_set):
     #if config.LOG_DEBUG: print('get_jaccard_similarity=>candidate_set=%s'%(str(candidate_set)))
     for _b_set, _s_set in itertools.permutations(candidate_set,2):
 
-        print("bset and sset", _b_set, _s_set)
         if long(_b_set[3]) < long(_s_set[3]) or long(_b_set[3]) > (long(_s_set[3]) + config.TIME_WINDOW):
             continue
 
@@ -107,8 +106,9 @@ def get_jaccard_similarity(candidate_set):
             _similar_dict[(_b_set[0],_b_set[2],_b_set[3])].append([_jaccard_similarity, (_s_set[0],_s_set[2],_s_set[3]) ])
 
     # filter and select top similar set.
-    _similar_dict = dict( [(k,sorted(v, key=lambda x: (x[0],-x[1][2]), reverse=True)[:config.NUM_OF_MOST_SIMILAR_SET])
-                        for k,v in _similar_dict.items() if len(v)>0])
+    # _similar_dict = dict( [(k,sorted(v, key=lambda x: (x[0],-x[1][2]), reverse=True)[:config.NUM_OF_MOST_SIMILAR_SET])
+    #                     for k,v in _similar_dict.items() if len(v)>0])
+    
     #if config.LOG_DEBUG: print('get_jaccard_similarity=> _similar_dict=%s'%(_similar_dict))
     #end_time = time.time()
     #if config.LOG_DEBUG: print("get_jaccard_similarity run time (seconds): {0} seconds".format(end_time - start_time))
