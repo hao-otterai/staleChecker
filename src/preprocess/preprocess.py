@@ -60,7 +60,8 @@ def store_preprocessed_redis(iterator):
         save_content = {"headline": news.headline, "body": news.body, "timestamp": news.timestamp} #news.text_body_stemmed
         if config.LOG_DEBUG: print(save_content['headline'])
         #try:
-        rdb.zadd("newsId", news.timestamp, news.id)
+        #rdb.zadd("newsId", news.timestamp, news.id)
+        rdb.sadd("newsId", "{}:{}".format(news.id, news.timestamp))
         rdb.hmset("news:{}".format(news.id), save_content)
         #except Exception as e:
         #    print("ERROR: failed to save news id:{0} to Redis".format(news.id))
@@ -148,8 +149,7 @@ def preprocess_file(bucket_name, file_name):
         print(df_preprocessed.first())
 
     # write to Redis
-    if config.LOG_DEBUG:
-        print("store preprocessed news")
+    if config.LOG_DEBUG: print("store preprocessed news")
     df_preprocessed.foreachPartition(store_preprocessed_redis)
 
     # Write to AWS
