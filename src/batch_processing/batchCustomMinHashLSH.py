@@ -166,6 +166,8 @@ def find_similar_cands_per_tag(tag, mh, lsh):
 
     rdd_cands = rdd_common_bucket.map(lambda cand_set: get_jaccard_similarity(cand_set))
 
+    if config.LOG_DEBUG: print('rdd_cands: ', rdd_cands.first())
+
     similar_dict = rdd_cands.flatMap(lambda x: x.items()).reduceByKey(
             lambda acc, val: _merge_result(acc, val)).collectAsMap()
     if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_dict))
