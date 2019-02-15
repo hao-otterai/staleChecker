@@ -76,54 +76,78 @@ def compute_minhash_lsh(df):
     return df
 
 
-def test_process_mini_batch(rdd, input_schema, mh, lsh):
+def test_process_mini_batch(rdd, mh, lsh):
     for news in rdd:
         if len(news) > 0:
-            test_func(news, input_schema, mh, lsh)
+            test_func(news, mh, lsh)
 
 
-def test_func(input, input_schema,  mh, lsh):
-    if config.LOG_DEBUG: print(input)
+def test_func(news,  mh, lsh):
 
-    df = conver_rdd_to_df(input, input_schema)
-    if config.LOG_DEBUG: print(df.collect())
+    # # Store similar candidates in Redis
+    def _helper_save2redis(iter, news):
+        rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+        token = "dup_cand:{}".format(news['id']) # id
+        for entry in iter:
+            processed_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+            dup = tuple(news['headline'], news['timestamp'], entry.id, entry.headline,
+                            entry.timestamp, entry.ingest_timestamp, processed_timestamp)
+            rdb.zadd(token, entry.jaccard_sim, dup)
 
-    df_preprocess = preprocess.df_preprocess_func(df)
-    news = compute_minhash_lsh(df_preprocess)
-    if config.LOG_DEBUG: print(news.collect())
-
-
+    """
+    input news is a list consisting of the following fields:
+    ['body', 'display_date', 'djn_urgency', 'headline', 'hot', 'id',
+    'source', 'tag_company', 'text_body', 'text_body_stemmed', 'timestamp']
+    """
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-    # tags = news["tag_company"]
+
+    q_id = news[5] # 'id'
+    q_timestamp = long(news[-1])
+    q_mh = mh.calc_min_hash_signature(news[9]) #'text_body_stemmed'
+    q_lsh = lsh.find_lsh_buckets(q_mh)
+    tags = news[7]  # tags
+
+    max_tag = ""
+    max_tag_table_size = 0
+
+    # Store tag + news in Redis
+    q_json = json.dumps({"id": q_id, "headline": news[3], "min_hash": tuple(q_mh), "lsh_hash": tuple(q_lsh), "timestamp": q_timestamp})
+    for tag in tags:
+        rdb.zadd("lsh:{0}".format(tag), q_timestamp, q_json)
+        rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+
     tq = []
-    for tag in news.tag_company:
-        #tq += rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
-        tq += rdb.zrangebyscore("lsh:{0}".format(tag), long(news.timestamp)-config.TIME_WINDOW,
-                                long(news.timestamp), withscores=False)
+    for tag in tags:
+        tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
     tq = list(set(tq))
     df = sql_context.read.json(sc.parallelize(tq))
 
-    udf_num_common_buckets = udf(lambda x: util.intersection(x, news.lsh_hash), IntegerType())
-    udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, news.min_hash), FloatType())
-    df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
+    udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
+    udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
+    filtered_df = df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
             col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT).withColumn(
             'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
             col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
 
     if config.LOG_DEBUG:
-        df.count().map(lambda x: "{} similar news found".format(x))
+        filtered_df.count().map(lambda x: "{} similar news found".format(x))
 
-    def _helper(iter, news):
-        rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-        token = "dup_cand:{}".format(news.id)
-        for entry in iter:
-            processed_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-            dup = tuple(news.headline, news.timestamp, entry.id, entry.headline,
-                            entry.timestamp, entry.ingest_timestamp, processed_timestamp)
-            rdb.zadd(token, entry.jaccard_sim, dup)
+    filtered_df.foreachPartition(lambda iter: _helper_save2redis(iter,
+            {"id": news[5], "headline": news[3], "timestamp": q_timestamp}))
 
-    # # Store similar candidates in Redis
-    df.foreachPartition(lambda iter: _helper(iter, news))
+    # tq_table = rdb.zrevrange("lsh:{0}".format(tag), 0, config.MAX_QUESTION_COMPARISON, withscores=False)
+    # tq = [json.loads(tq_entry) for tq_entry in tq_table]
+    #
+    # for entry in tq:
+    #     if(entry["id"] != q_id):
+    #         lsh_comparison = lsh.common_bands_count(entry["lsh_hash"], q_lsh)
+    #         if(lsh_comparison > config.LSH_SIMILARITY_BAND_COUNT):
+    #             mh_comparison = mh.jaccard_sim_score(entry["min_hash"], q_mh)
+    #             print(colored("MH comparison:{0}".format(mh_comparison), "blue"))
+    #             if(mh_comparison > config.DUP_QUESTION_MIN_HASH_THRESHOLD):
+    #                 cand_reformatted = (tag, q_id, question["title"], entry["id"], entry["title"], question["timestamp"])
+    #                 print(colored("Found candidate: {0}".format(cand_reformatted), "cyan"))
+    #                 rdb.zadd("dup_cand", mh_comparison, cand_reformatted)
 
 
 
@@ -227,7 +251,7 @@ def main():
                     {"metadata.broker.list": ",".join(config.KAFKA_SERVERS)} )
 
     # schema for converting input news stream RDD[json] to DataFrame
-    input_schema = StructType([StructField(field, StringType(), nullable = True) for field in config.INPUT_SCHEMA_FIELDS])
+    #input_schema = StructType([StructField(field, StringType(), nullable = True) for field in config.INPUT_SCHEMA_FIELDS])
 
     #  Create and save MinHash and LSH if not exist or load them from file
     if(not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
@@ -249,7 +273,7 @@ def main():
     dstream = kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda x: _ingest_timestamp(x))
     count_mini_batch = dstream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
     #dstream.foreachRDD(lambda rdd: process_mini_batch(rdd, input_schema, mh, lsh))
-    dstream.foreachRDD(lambda rdd: rdd.foreachPartition(lambda news: test_process_mini_batch(news,input_schema, mh, lsh)))
+    dstream.foreachRDD(lambda rdd: rdd.foreachPartition(lambda news: test_process_mini_batch(news, mh, lsh)))
 
 
     ssc.start()
