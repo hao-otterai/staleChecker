@@ -27,9 +27,12 @@ class Producer(threading.Thread):
         #json_file = sql_context.read.json(file_dir).collect()
         with open(file_dir) as f: json_file = json.load(f)
 
+        fields = ['body', 'display_date', 'djn_urgency', 'headline', 'hot', 'id',
+        'source', 'tag_company', 'text_body', 'text_body_stemmed', 'timestamp']
         for line in json_file:
-            if config.LOG_DEBUG: print(line)
-            producer.send(config.KAFKA_TOPIC, line)
+            js = dict(zip(fields, line))
+            if config.LOG_DEBUG: print(js['headline'])
+            producer.send(config.KAFKA_TOPIC, js)
             time.sleep(config.KAFKA_CONSUMER_REFRESH)
 
 def main():

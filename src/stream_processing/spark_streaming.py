@@ -85,7 +85,7 @@ def test_process_mini_batch(rdd, mh, lsh):
 
 def test_func(news,  mh, lsh):
     # # Store similar candidates in Redis
-    def _helper_save2redis(iter, news):
+    def _save2redis(iter, news):
         rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
         token = "dup_cand:{}".format(news['id']) # id
         for entry in iter:
@@ -94,24 +94,15 @@ def test_func(news,  mh, lsh):
                             entry.timestamp, news['ingest_timestamp'], processed_timestamp)
             rdb.zadd(token, entry.jaccard_sim, dup)
 
-    """
-    input news is a list consisting of the following fields:
-    ['body', 'display_date', 'djn_urgency', 'headline', 'hot', 'id',
-    'source', 'tag_company', 'text_body', 'text_body_stemmed', 'timestamp']
-    """
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
-    q_id = news[5] # 'id'
-    q_timestamp = long(news[10])
-    q_mh = mh.calc_min_hash_signature(news[9]) #'text_body_stemmed'
+    q_timestamp = long(news['timestamp'])
+    q_mh = mh.calc_min_hash_signature(news['text_body_stemmed']) #
     q_lsh = lsh.find_lsh_buckets(q_mh)
-    tags = news[7]  # tags
-
-    max_tag = ""
-    max_tag_table_size = 0
+    tags = news['tag_company']
 
     # Store tag + news in Redis
-    q_json = json.dumps({"id": q_id, "headline": news[3], "min_hash": tuple(q_mh),
+    q_json = json.dumps({"id": news['id'], "headline": news['headline'], "min_hash": tuple(q_mh),
                         "lsh_hash": tuple(q_lsh), "timestamp": q_timestamp})
     for tag in tags:
         rdb.zadd("lsh:{0}".format(tag), q_timestamp, q_json)
@@ -133,8 +124,7 @@ def test_func(news,  mh, lsh):
     if config.LOG_DEBUG:
         filtered_df.count().map(lambda x: "{} similar news found".format(x))
 
-    filtered_df.foreachPartition(lambda iter: _helper_save2redis(iter,
-            {"id": news[5], "headline": news[3], "timestamp": q_timestamp, 'ingest_timestamp': news[11] }))
+    filtered_df.foreachPartition(lambda iter: _save2redis(iter, news))
 
     # tq_table = rdb.zrevrange("lsh:{0}".format(tag), 0, config.MAX_QUESTION_COMPARISON, withscores=False)
     # tq = [json.loads(tq_entry) for tq_entry in tq_table]
@@ -267,8 +257,9 @@ def main():
         lsh = util.load_pickle_file(config.LSH_PICKLE)
     if config.LOG_DEBUG: print('mh and lsh init finished')
 
-    def _ingest_timestamp(dlist):
-        return dlist.append(datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p"))
+    def _ingest_timestamp(data):
+        data['ingest_timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+        return data
 
     kafka_stream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
 
