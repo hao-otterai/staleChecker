@@ -77,54 +77,50 @@ def compute_minhash_lsh(df):
     return df
 
 
-def test_process_mini_batch(rdd, mh, lsh):
-    for news in rdd:
-        if len(news) > 0:
-            test_func(news, mh, lsh)
-
-
-def test_func(news,  mh, lsh):
-    # # Store similar candidates in Redis
-    def _save2redis(iter, news):
-        rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-        token = "dup_cand:{}".format(news['id']) # id
-        for entry in iter:
-            processed_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-            dup = tuple(news['headline'], news['timestamp'], entry.id, entry.headline,
-                            entry.timestamp, news['ingest_timestamp'], processed_timestamp)
-            rdb.zadd(token, entry.jaccard_sim, dup)
-
+def save2redis(iter, news):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    token = "dup_cand:{}".format(news['id']) # id
+    for entry in iter:
+        processed_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+        dup = tuple(news['headline'], news['timestamp'], entry.id, entry.headline,
+                        entry.timestamp, news['ingest_timestamp'], processed_timestamp)
+        rdb.zadd(token, entry.jaccard_sim, dup)
 
-    q_timestamp = long(news['timestamp'])
-    q_mh = mh.calc_min_hash_signature(news['text_body_stemmed']) #
-    q_lsh = lsh.find_lsh_buckets(q_mh)
-    tags = news['tag_company']
 
-    # Store tag + news in Redis
-    q_json = json.dumps({"id": news['id'], "headline": news['headline'], "min_hash": tuple(q_mh),
-                        "lsh_hash": tuple(q_lsh), "timestamp": q_timestamp})
-    for tag in tags:
-        rdb.zadd("lsh:{0}".format(tag), q_timestamp, q_json)
-        rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
 
-    tq = []
-    for tag in tags:
-        tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
-    tq = list(set(tq))
-    df = sql_context.read.json(sc.parallelize(tq))
+def test_func(iter,  mh, lsh):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    for news in iter:
+        if len(news) > 0:
+            q_timestamp = long(news['timestamp'])
+            q_mh = mh.calc_min_hash_signature(news['text_body_stemmed']) #
+            q_lsh = lsh.find_lsh_buckets(q_mh)
+            tags = news['tag_company']
 
-    udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
-    udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
-    filtered_df = df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
-            col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT).withColumn(
-            'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
-            col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+            # Store tag + news in Redis
+            q_json = json.dumps({"id": news['id'], "headline": news['headline'], "min_hash": tuple(q_mh),
+                                "lsh_hash": tuple(q_lsh), "timestamp": q_timestamp})
+            for tag in tags:
+                rdb.zadd("lsh:{0}".format(tag), q_timestamp, q_json)
+                rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
 
-    if config.LOG_DEBUG:
-        filtered_df.count().map(lambda x: "{} similar news found".format(x))
+            tq = []
+            for tag in tags:
+                tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
+            tq = list(set(tq))
+            df = sql_context.read.json(sc.parallelize(tq))
 
-    filtered_df.foreachPartition(lambda iter: _save2redis(iter, news))
+            udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
+            udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
+            filtered_df = df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
+                    col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT).withColumn(
+                    'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
+                    col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+
+            if config.LOG_DEBUG:
+                filtered_df.count().map(lambda x: "{} similar news found".format(x))
+
+            filtered_df.foreachPartition(lambda iter: save2redis(iter, news))
 
     # tq_table = rdb.zrevrange("lsh:{0}".format(tag), 0, config.MAX_QUESTION_COMPARISON, withscores=False)
     # tq = [json.loads(tq_entry) for tq_entry in tq_table]
@@ -216,10 +212,7 @@ def process_news(iter):
             print(e)
 
 
-
-
 def main():
-
     spark_conf = SparkConf().setAppName("Spark Streaming MinHashLSH")
     global sc
     sc = SparkContext(conf=spark_conf)
@@ -237,35 +230,28 @@ def main():
     ssc = StreamingContext(sc, config.SPARK_STREAMING_MINI_BATCH_WINDOW)
     #ssc.checkpoint("_spark_streaming_checkpoint")
 
+    mh, lsh = batch_process.load_mh_lsh()
+
     kafka_stream = KafkaUtils.createDirectStream( ssc,
                     [config.KAFKA_TOPIC],
                     {"metadata.broker.list": ",".join(config.KAFKA_SERVERS)} )
 
+    kafka_stream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
+
     # schema for converting input news stream RDD[json] to DataFrame
     #input_schema = StructType([StructField(field, StringType(), nullable = True) for field in config.INPUT_SCHEMA_FIELDS])
-
-    #  Create and save MinHash and LSH if not exist or load them from file
-    if(not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
-        mh = min_hash.MinHash(config.MIN_HASH_K_VALUE)
-        lsh = locality_sensitive_hash.LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
-        print('saving mh, lsh to file {}, {}'.format(config.MIN_HASH_PICKLE, config.LSH_PICKLE))
-        util.save_pickle_file(mh, config.MIN_HASH_PICKLE)
-        util.save_pickle_file(lsh, config.LSH_PICKLE)
-    else:
-        if config.LOG_DEBUG: print('loading mh and lsh from local files')
-        mh = util.load_pickle_file(config.MIN_HASH_PICKLE)
-        lsh = util.load_pickle_file(config.LSH_PICKLE)
-    if config.LOG_DEBUG: print('mh and lsh init finished')
 
     def _ingest_timestamp(data):
         data['ingest_timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
         return data
 
-    kafka_stream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
+
+    def test_process_mini_batch(rdd, mh, lsh):
+        rdd.foreachPartition(lambda iter: test_func(iter, mh, lsh))
 
     kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
-            lambda x: _ingest_timestamp(x)).foreachRDD(
-            lambda rdd: rdd.foreachPartition(lambda news: test_process_mini_batch(news, mh, lsh)))
+        lambda x: _ingest_timestamp(x)).foreachRDD(
+        lambda rdd: test_process_mini_batch(rdd, mh, lsh))
 
 
     ssc.start()
