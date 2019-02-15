@@ -246,12 +246,14 @@ def main():
         return data
 
 
-    def test_process_mini_batch(rdd, mh, lsh):
+    def _test_process_mini_batch(rdd, mh, lsh):
         rdd.foreachPartition(lambda iter: test_func(iter, mh, lsh))
 
+    def _test(rdd, mh, lsh):
+        print(rdd.first())
+
     kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
-        lambda x: _ingest_timestamp(x)).foreachRDD(
-        lambda rdd: test_process_mini_batch(rdd, mh, lsh))
+        lambda x: _ingest_timestamp(x)).foreachRDD(lambda rdd: _test(rdd, mh, lsh))
 
 
     ssc.start()
