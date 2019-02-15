@@ -81,9 +81,9 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
             temp1 = rdb.hget("jacc_sim", '{}:{}'.format(_b_id, _s_id))
             temp2 = rdb.hget("jacc_sim", '{}:{}'.format(_b_id, _s_id))
             if temp1 is not None:
-                rdb.sadd("dup_cand:{}".format(_b_id), (_s_id, temp1))
+                rdb.sadd("dup_cand:{}".format(_b_id), _sid)
             elif temp2 is not None:
-                rdb.sadd("dup_cand:{}".format(_s_id), (_b_id, temp2))
+                rdb.sadd("dup_cand:{}".format(_s_id), _b_id)
             else:
                 _sim  = rdb.hgetall('news:{}'.format(_s_id))
                 _sim['timestamp'] = long(_sim['timestamp'])
@@ -104,10 +104,9 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
 
                 # if jaccard_sim is above threshold, save as dup_cand to Redis
                 if jacc_sim > config.DUP_QUESTION_MIN_HASH_THRESHOLD:
-                    rdb.sadd("dup_cand:{}".format(b_id), (s_id, jacc_sim))
+                    rdb.sadd("dup_cand:{}".format(b_id), s_id)
                     if config.LOG_DEBUG:
-                        print('found dup candidate {}-{}: {}'.format(
-                        base['headline'], sim['headline'], jacc_sim))
+                        print('Dup candidate {}-{}: {}'.format( base['headline'], sim['headline'], jacc_sim))
 
 
 def get_jaccard_similarity(candidate_set):
