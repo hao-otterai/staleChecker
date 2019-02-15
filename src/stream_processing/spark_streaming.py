@@ -88,128 +88,91 @@ def save2redis(iter, news):
 
 
 
-def test_func(iter,  mh, lsh):
+def process_news(news,  mh, lsh):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+
+    q_timestamp = long(news['timestamp'])
+    q_mh = mh.calc_min_hash_signature(news['text_body_stemmed']) #
+    q_lsh = lsh.find_lsh_buckets(q_mh)
+    tags = news['tag_company']
+
+    # Store tag + news in Redis
+    q_json = json.dumps({"id": news['id'], "headline": news['headline'], "min_hash": tuple(q_mh),
+                        "lsh_hash": tuple(q_lsh), "timestamp": q_timestamp})
+    for tag in tags:
+        rdb.zadd("lsh:{0}".format(tag), q_timestamp, q_json)
+        rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+
+    tq = []
+    for tag in tags:
+        tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
+    tq = list(set(tq))
+    df = sql_context.read.json(sc.parallelize(tq))
+
+    udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
+    udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
+    filtered_df = df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
+            col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT).withColumn(
+            'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
+            col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+
+    if config.LOG_DEBUG:
+        filtered_df.count().map(lambda x: "{} similar news found".format(x))
+
+    filtered_df.foreachPartition(lambda iter: save2redis(iter, news))
+
+# def process_news(iter):
+#     """
+#     for each news, do the following for similarity comparison:
+#         1) filter news within the pass 3 days
+#         2) filter news with at least one common company tags (intersection)
+#         3) filter news with at least one common band
+#         4) filter news with jaccard sim score above threshold
+#         5) save result to redis and return
+#     """
+#     def helper(iter, news):
+#         rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+#         token = "dup_cand:{}".format(news.id)
+#         for entry in iter:
+#             processed_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+#             dup = tuple(news.headline, news.timestamp, entry.id, entry.headline,
+#                             entry.timestamp, entry.ingest_timestamp, processed_timestamp)
+#             rdb.zadd(token, entry.jaccard_sim, dup)
+#
+#     for news in iter:
+#         try:
+#             if len(news)>0:
+#                 rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+#                 # tags = news["tag_company"]
+#                 tq = []
+#                 for tag in news.tag_company:
+#                     #tq += rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
+#                     tq += rdb.zrangebyscore("lsh:{0}".format(tag), long(news.timestamp)-config.TIME_WINDOW,
+#                                             long(news.timestamp), withscores=False)
+#                 tq = list(set(tq))
+#                 df = sql_context.read.json(sc.parallelize(tq))
+#
+#                 udf_num_common_buckets = udf(lambda x: util.intersection(x, news.lsh_hash), IntegerType())
+#                 udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, news.min_hash), FloatType())
+#                 df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
+#                         col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT).withColumn(
+#                         'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
+#                         col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+#
+#                 if config.LOG_DEBUG:
+#                     df.count().map(lambda x: "{} similar news found".format(x))
+#
+#                 # # Store similar candidates in Redis
+#                 df.foreachPartition(lambda iter: helper(iter, news))
+#         except Exception as e:
+#             print(e)
+
+
+def process_mini_batch(iter, mh, lsh):
     for news in iter:
         if len(news) > 0:
-            q_timestamp = long(news['timestamp'])
-            q_mh = mh.calc_min_hash_signature(news['text_body_stemmed']) #
-            q_lsh = lsh.find_lsh_buckets(q_mh)
-            tags = news['tag_company']
+            process_news(news,  mh, lsh)
 
-            # Store tag + news in Redis
-            q_json = json.dumps({"id": news['id'], "headline": news['headline'], "min_hash": tuple(q_mh),
-                                "lsh_hash": tuple(q_lsh), "timestamp": q_timestamp})
-            for tag in tags:
-                rdb.zadd("lsh:{0}".format(tag), q_timestamp, q_json)
-                rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
-
-            tq = []
-            for tag in tags:
-                tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
-            tq = list(set(tq))
-            df = sql_context.read.json(sc.parallelize(tq))
-
-            udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
-            udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
-            filtered_df = df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
-                    col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT).withColumn(
-                    'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
-                    col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
-
-            if config.LOG_DEBUG:
-                filtered_df.count().map(lambda x: "{} similar news found".format(x))
-
-            filtered_df.foreachPartition(lambda iter: save2redis(iter, news))
-
-    # tq_table = rdb.zrevrange("lsh:{0}".format(tag), 0, config.MAX_QUESTION_COMPARISON, withscores=False)
-    # tq = [json.loads(tq_entry) for tq_entry in tq_table]
-    #
-    # for entry in tq:
-    #     if(entry["id"] != q_id):
-    #         lsh_comparison = lsh.common_bands_count(entry["lsh_hash"], q_lsh)
-    #         if(lsh_comparison > config.LSH_SIMILARITY_BAND_COUNT):
-    #             mh_comparison = mh.jaccard_sim_score(entry["min_hash"], q_mh)
-    #             print(colored("MH comparison:{0}".format(mh_comparison), "blue"))
-    #             if(mh_comparison > config.DUP_QUESTION_MIN_HASH_THRESHOLD):
-    #                 cand_reformatted = (tag, q_id, question["title"], entry["id"], entry["title"], question["timestamp"])
-    #                 print(colored("Found candidate: {0}".format(cand_reformatted), "cyan"))
-    #                 rdb.zadd("dup_cand", mh_comparison, cand_reformatted)
-
-
-
-
-def process_mini_batch(rdd, input_schema, mh, lsh):
-    if not rdd.isEmpty():
-        # convert dstream RDD to DataFrame. This is necessary for the preprocessing
-        # which involves transform operations using MLlib
-        df = conver_rdd_to_df(rdd, input_schema)
-        if config.LOG_DEBUG: print(df.first())
-
-        # preprocess
-        df_preprocess = preprocess.df_preprocess_func(df)
-
-        # calculate CustomMinHashLSH
-        df_with_hash_sig = compute_minhash_lsh(df_preprocess, mh, lsh)
-
-        # # Extract data that we want
-        # df_preprocess.registerTempTable("df_preprocess")
-        # _output_fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
-        # global sql_context
-        # df_preprocess_final = sql_context.sql( "SELECT {} from df_preprocess".format(_output_fields) )
-
-        # try:
-        df_with_hash_sig.foreachPartition(process_news)
-        # except Exception as e:
-        #     print("process_mini_batch error: ", e)
-
-
-
-def process_news(iter):
-    """
-    for each news, do the following for similarity comparison:
-        1) filter news within the pass 3 days
-        2) filter news with at least one common company tags (intersection)
-        3) filter news with at least one common band
-        4) filter news with jaccard sim score above threshold
-        5) save result to redis and return
-    """
-    def helper(iter, news):
-        rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-        token = "dup_cand:{}".format(news.id)
-        for entry in iter:
-            processed_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-            dup = tuple(news.headline, news.timestamp, entry.id, entry.headline,
-                            entry.timestamp, entry.ingest_timestamp, processed_timestamp)
-            rdb.zadd(token, entry.jaccard_sim, dup)
-
-    for news in iter:
-        try:
-            if len(news)>0:
-                rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-                # tags = news["tag_company"]
-                tq = []
-                for tag in news.tag_company:
-                    #tq += rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
-                    tq += rdb.zrangebyscore("lsh:{0}".format(tag), long(news.timestamp)-config.TIME_WINDOW,
-                                            long(news.timestamp), withscores=False)
-                tq = list(set(tq))
-                df = sql_context.read.json(sc.parallelize(tq))
-
-                udf_num_common_buckets = udf(lambda x: util.intersection(x, news.lsh_hash), IntegerType())
-                udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, news.min_hash), FloatType())
-                df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
-                        col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT).withColumn(
-                        'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
-                        col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
-
-                if config.LOG_DEBUG:
-                    df.count().map(lambda x: "{} similar news found".format(x))
-
-                # # Store similar candidates in Redis
-                df.foreachPartition(lambda iter: helper(iter, news))
-        except Exception as e:
-            print(e)
 
 
 def main():
@@ -246,15 +209,8 @@ def main():
         return data
 
 
-    def _test_process_mini_batch(rdd, mh, lsh):
-        rdd.foreachPartition(lambda iter: test_func(iter, mh, lsh))
-
-    def _test(rdd, mh, lsh):
-        rdd.foreachPartition(lambda iter: iter.foreach(lambda x: print(x)))
-
-    kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
-        lambda x: _ingest_timestamp(x)).foreachRDD(lambda rdd: _test(rdd, mh, lsh))
-
+    kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda x: _ingest_timestamp(x))\
+        .foreachRDD(lambda rdd: rdd.foreachPartition(lambda x: process_mini_batch(x, mh, lsh)))
 
     ssc.start()
     ssc.awaitTermination()
