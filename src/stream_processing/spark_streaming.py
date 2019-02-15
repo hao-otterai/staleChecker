@@ -168,7 +168,8 @@ def process_news(news,  mh, lsh):
 #             print(e)
 
 
-def process_mini_batch(iter, mh, lsh):
+def process_mini_batch(iter):
+    mh, lsh = batch_process.load_mh_lsh()
     for news in iter:
         if len(news) > 0:
             process_news(news,  mh, lsh)
@@ -193,7 +194,6 @@ def main():
     ssc = StreamingContext(sc, config.SPARK_STREAMING_MINI_BATCH_WINDOW)
     #ssc.checkpoint("_spark_streaming_checkpoint")
 
-    mh, lsh = batch_process.load_mh_lsh()
 
     kafka_stream = KafkaUtils.createDirectStream( ssc,
                     [config.KAFKA_TOPIC],
@@ -208,9 +208,11 @@ def main():
         data['ingest_timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
         return data
 
-
     kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda x: _ingest_timestamp(x))\
-        .foreachRDD(lambda rdd: rdd.foreachPartition(lambda x: process_mini_batch(x, mh, lsh)))
+        .foreachRDD(lambda rdd: rdd.foreachPartition(process_mini_batch))
+
+    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda x: _ingest_timestamp(x))\
+    #     .foreachRDD(lambda rdd: rdd.foreachPartition(lambda x: process_mini_batch(x, mh, lsh)))
 
     ssc.start()
     ssc.awaitTermination()
