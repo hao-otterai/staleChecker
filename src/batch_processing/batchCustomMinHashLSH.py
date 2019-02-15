@@ -80,7 +80,7 @@ def get_jaccard_similarity(candidate_set):
     return = {base_set:(similar_set:jaccard_similarity, )}
     """
     if config.LOG_DEBUG: print(candidate_set)
-    
+
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     _similar_dict = {}
     #if config.LOG_DEBUG: print('get_jaccard_similarity=>candidate_set=%s'%(str(candidate_set)))
@@ -167,7 +167,7 @@ def find_similar_cands_per_tag(tag, mh, lsh):
     if config.LOG_DEBUG: print('rdd_common_bucket: ', rdd_common_bucket.first())
 
     #rdd_cands = rdd_common_bucket.mapPartitions(lambda rdd: rdd.foreach(get_jaccard_similarity))
-    rdd_cands = rdd_common_bucket.mapPartitions(get_jaccard_similarity)
+    rdd_cands = rdd_common_bucket.foreachPartition(lambda rdd: rdd.map(lambda x: get_jaccard_similarity(x)))
     if config.LOG_DEBUG: print('rdd_cands: ', rdd_cands.first())
 
     similar_dict = rdd_cands.flatMap(lambda x: x.items()).reduceByKey(
