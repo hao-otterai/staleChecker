@@ -51,7 +51,8 @@ def store_lsh_redis_by_tag(iter):
 
         #if config.LOG_DEBUG: print(q_json)
         for tag in q.tag_company:
-            rdb.zadd("lsh:{}".format(tag), q.timestamp, q_json)
+            # rdb.zadd("lsh:{}".format(tag), q.timestamp, q_json)
+            rdb.sadd("lsh:{}".format(tag), q_json)
             rdb.sadd("lsh_keys", "lsh:{}".format(tag))
         #except Exception as e:
         #    print("ERROR: failed to save tag {0} to Redis".format(tag))
