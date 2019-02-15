@@ -47,7 +47,8 @@ def store_lsh_redis_by_tag(iter):
     for q in iter:
         if config.LOG_DEBUG: print(q.headline)
         #q_json = json.dumps({ "min_hash": q.min_hash, "lsh_hash": q.lsh_hash})
-        rdb.hmset("news:{}".format(q.id), { "min_hash": q.min_hash, "lsh_hash": q.lsh_hash})
+        rdb.hmset("news:{}".format(q.id), { "min_hash": ','.join(str(x) for x in q.min_hash),
+                "lsh_hash": ','.join(str(x) for x in q.lsh_hash)})
         #if config.LOG_DEBUG: print(q_json)
         for tag in q.tag_company:
             # rdb.zadd("lsh:{}".format(tag), q.timestamp, q_json)

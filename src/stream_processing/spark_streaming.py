@@ -69,23 +69,28 @@ def process_news(news):
     if config.LOG_DEBUG: print('process_news: {}'.format(news))
 
     q_timestamp = long(news['timestamp'])
-    q_mh = mh.calc_min_hash_signature(news['text_body_stemmed']) #
+    q_mh = mh.calc_min_hash_signature(news['text_body_stemmed'])
     q_lsh = lsh.find_lsh_buckets(q_mh)
-    tags = news['tag_company']
 
     # Store tag + news in Redis
 
-    q_json = json.dumps({"id": news['id'], "headline": news['headline'], "min_hash": tuple(q_mh),
-                        "lsh_hash": tuple(q_lsh), "timestamp": q_timestamp})
-    if config.LOG_DEBUG: print('save news data to Redis: {}'.format(q_json))
+    news_data = {"headline": news['headline'], "min_hash": tuple(q_mh),
+                        "lsh_hash": tuple(q_lsh), "timestamp": q_timestamp}
+    if config.LOG_DEBUG: print('save news data to Redis: {}'.format(news_data))
 
-    for tag in tags:
-        rdb.zadd("lsh:{0}".format(tag), q_timestamp, q_json)
+    rdb.hmset("news:{}".format(news['id']), news_data)
+    for tag in news['tag_company']:
+        # rdb.zadd("lsh:{}".format(tag), q.timestamp, json.dumps(news_data))
+        rdb.sadd("lsh:{}".format(tag), news['id'])
+        rdb.sadd("lsh_keys", "lsh:{}".format(tag))
+
+    # for tag in news['tag_company']:
+    #     rdb.zadd("lsh:{0}".format(tag), q_timestamp, json.dumps(news_data))
         #rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
 
 
     tq = []
-    for tag in tags:
+    for tag in news['tag_company']:
         tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
     if config.LOG_DEBUG: print("{} historical news in the same tag(s)".format(len(tq)))
 
