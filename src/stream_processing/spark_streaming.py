@@ -113,7 +113,7 @@ def process_news(news):
     tq = []
     for tag in tags:
         tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
-    tq = list(set(tq))
+
     df = sql_context.read.json(sc.parallelize(tq))
     if config.LOG_DEBUG: df.printSchema()
 
