@@ -72,6 +72,43 @@ def compute_minhash_lsh(df, mh, lsh):
     return df
 
 
+def get_jacc_sim_and_save_result_redis(candidate_set):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    for idx, _b_id in enumerate(candidate_set):
+        _base = rdb.hgetall('news:{}'.format(_b_id))
+        _base['timestamp'] = long(_base['timestamp'])
+        for _s_id in candidate_set[idx+1:]:
+            temp1 = rdb.hget("jacc_sim", '{}:{}'.format(_b_id, _s_id))
+            temp2 = rdb.hget("jacc_sim", '{}:{}'.format(_b_id, _s_id))
+            if temp1 is not None:
+                rdb.sadd("dup_cand:{}".format(_b_id), (_s_id, temp1))
+            elif temp2 is not None:
+                rdb.sadd("dup_cand:{}".format(_s_id), (_b_id, temp2))
+            else:
+                _sim  = rdb.hgetall('news:{}'.format(_s_id))
+                _sim['timestamp'] = long(_sim['timestamp'])
+                if abs(_base['timestamp'] - _sim['timestamp']) > config.TIME_WINDOW:
+                    continue
+
+                # base is a news which appear later
+                if _base['timestamp'] < _sim['timestamp']:
+                    base, sim = _sim, _base
+                    b_id, s_id = _s_id, _b_id
+                else:
+                    base, sim = _base, _sim
+                    b_id, s_id = _b_id, s_id
+
+                #calculate jaccard similarity and update redis cache
+                jacc_sim = util.jaccard_sim_score(base['lsh_hash'], sim['lsh_hash'])
+                rdb.hset("jacc_sim", '{}:{}'.format(b_id, s_id), jacc_sim)
+
+                # if jaccard_sim is above threshold, save as dup_cand to Redis
+                if jacc_sim > config.DUP_QUESTION_MIN_HASH_THRESHOLD:
+                    rdb.sadd("dup_cand:{}".format(b_id), (s_id, jacc_sim))
+                    if config.LOG_DEBUG:
+                        print('found dup candidate {}-{}: {}'.format(
+                        base['headline'], sim['headline'], jacc_sim))
+
 
 def get_jaccard_similarity(candidate_set):
     """
@@ -158,18 +195,24 @@ def find_similar_cands_per_tag(tag, mh, lsh):
     if config.LOG_DEBUG: print("tag {0}: {1} news".format(tag, len(tq)))
     df = sql_context.read.json(sc.parallelize(tq))
 
-    def _convert_hash_string_to_list(x):
-        return [x[0],  x[1].split(',') if x[1] is not None else [], x[2], x[3],
-            x[4].split(',') if x[4] is not None else [] ]
+    def _helperFunc(iterator):
+        for cand_set in iterator:
+            get_jacc_sim_and_save_result_redis(cand_set)
 
-    rdd_common_bucket = df.select(col('id'), col('lsh_hash')).flatMap(
+    rdd_common_bucket = df.select(col('id'), col('lsh_hash')).rdd.flatMap(
         lambda x: (((hash, band), [x[0]]) for band, hash in enumerate(x[1]))).reduceByKey(
-        lambda a, b: _custom_extend(a,b)).filter(lambda x: len(x[1])>1).map(lambda x: tuple(x[1]))
+        lambda a, b: _custom_extend(a,b)).filter(lambda x: len(x[1])>1).map(
+        lambda x: tuple(x[1])).foreachPartition(_helperFunc)
+
+    # def _convert_hash_string_to_list(x):
+    #     return [x[0],  x[1].split(',') if x[1] is not None else [], x[2], x[3],
+    #         x[4].split(',') if x[4] is not None else [] ]
+    #
     # rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'),
     #     col('timestamp'), col('lsh_hash')).rdd.map(lambda x: _convert_hash_string_to_list(x)).flatMap(
     #     lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])]) for band, hash in enumerate(x[4]))).reduceByKey(
     #     lambda a, b: _custom_extend(a,b)).filter(lambda t: len(t[1])>1).map(lambda t: tuple(t[1]))
-    if config.LOG_DEBUG: print('rdd_common_bucket: ', rdd_common_bucket.first())
+    #if config.LOG_DEBUG: print('rdd_common_bucket: ', rdd_common_bucket.first())
 
     # rdd_cands = rdd_common_bucket.map(lambda cand_set: get_jaccard_similarity(cand_set))
     # #if config.LOG_DEBUG: print('rdd_cands: ', rdd_cands.first())
