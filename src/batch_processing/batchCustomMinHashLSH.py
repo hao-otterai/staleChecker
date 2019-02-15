@@ -39,6 +39,21 @@ def load_mh_lsh():
     return mh, lsh
 
 
+# Store news data
+def store_lsh_redis_by_tag(rdd):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    if config.LOG_DEBUG: print("store minhash and lsh by company tag")
+    for q in rdd:
+        if config.LOG_DEBUG: print(q)
+        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
+                    "lsh_hash": q.lsh_hash, "timestamp": q.timestamp })
+        #try:
+        for tag in q.tag_company:
+            rdb.zadd("lsh:{0}".format(tag), q.timestamp, q_json)
+            rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+        #except Exception as e:
+        #    print("ERROR: failed to save tag {0} to Redis".format(tag))
+
 
 # Computes MinHashes, LSHes for all in DataFrame
 def compute_minhash_lsh(df, mh, lsh):
@@ -47,20 +62,6 @@ def compute_minhash_lsh(df, mh, lsh):
 
     df = df.withColumn("min_hash", calc_min_hash("text_body_stemmed"))
     df = df.withColumn("lsh_hash", calc_lsh_hash("min_hash"))
-
-    # Store news data
-    def store_lsh_redis_by_tag(rdd):
-        rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-        if config.LOG_DEBUG: print("store minhash and lsh by company tag")
-        for q in rdd:
-            q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
-                        "lsh_hash": q.lsh_hash, "timestamp": q.timestamp })
-            try:
-                for tag in q.tag_company:
-                    rdb.zadd("lsh:{0}".format(tag), q.timestamp, q_json)
-                    rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
-            except Exception as e:
-                print("ERROR: failed to save tag {0} to Redis".format(tag))
 
     #if config.LOG_DEBUG: print(df.first())
     df.foreachPartition(store_lsh_redis_by_tag)
