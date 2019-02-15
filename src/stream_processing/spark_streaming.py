@@ -214,6 +214,7 @@ def main():
     #input_schema = StructType([StructField(field, StringType(), nullable = True) for field in config.INPUT_SCHEMA_FIELDS])
 
     def _ingest_timestamp(data):
+        if config.LOG_DEBUG: print(type(data), data)
         data['ingest_timestamp'] = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
         return data
 
