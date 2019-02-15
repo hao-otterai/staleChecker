@@ -93,12 +93,12 @@ def get_jaccard_similarity(candidate_set):
         _similar_dict[(_b_set[0],_b_set[2],_b_set[3])] = []
 
         #calculate jaccard similarity and update redis cache
-        jaccard_sim_token = '{}:{}'.format(_b_set[0], _s_set[0])
-        _jaccard_similarity = rdb.hget("jacc_sim", jaccard_sim_token)
-        if _jaccard_similarity is None:
-            _jaccard_similarity = util.jaccard_sim_score(_b_set[1], _s_set[1])
-            rdb.hset("jacc_sim", jaccard_sim_token, _jaccard_similarity)
-
+        # jaccard_sim_token = '{}:{}'.format(_b_set[0], _s_set[0])
+        # _jaccard_similarity = rdb.hget("jacc_sim", jaccard_sim_token)
+        # if _jaccard_similarity is None:
+        #     _jaccard_similarity = util.jaccard_sim_score(_b_set[1], _s_set[1])
+        #     rdb.hset("jacc_sim", jaccard_sim_token, _jaccard_similarity)
+        _jaccard_similarity = util.jaccard_sim_score(_b_set[1], _s_set[1])
 
         # Store the result and get top NUM_OF_MOST_SIMILAR_SET similar sets
         _jaccard_similarity = float(_jaccard_similarity)
