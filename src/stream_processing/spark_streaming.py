@@ -149,9 +149,11 @@ def process_news(news):
 
 
 def process_mini_batch(rdd):
-    if config.LOG_DEBUG: print("process_mini_batch")
+
     # rdd.foreachPartition(process_mini_batch)
-    for news in rdd.collect():
+    rddc =  rdd.collect()
+    if config.LOG_DEBUG: print("process_mini_batch {}".format(rddc))
+    for news in rddc:
         if len(news) > 0:
             #print(news)
             process_news(news)
