@@ -32,7 +32,7 @@ class Producer(threading.Thread):
         for line in json_file:
             js = dict(zip(fields, line))
             if config.LOG_DEBUG: print(js['headline'])
-            producer.send(config.KAFKA_TOPIC, js)
+            producer.send(config.KAFKA_TOPIC, json.dumps(js))
             time.sleep(config.KAFKA_CONSUMER_REFRESH)
 
 def main():
