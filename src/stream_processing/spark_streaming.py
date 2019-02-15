@@ -250,7 +250,7 @@ def main():
         rdd.foreachPartition(lambda iter: test_func(iter, mh, lsh))
 
     def _test(rdd, mh, lsh):
-        print(rdd.first())
+        rdd.foreachPartition(lambda iter: iter.foreach(lambda x: print(x)))
 
     kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
         lambda x: _ingest_timestamp(x)).foreachRDD(lambda rdd: _test(rdd, mh, lsh))
