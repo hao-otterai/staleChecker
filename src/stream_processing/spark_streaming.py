@@ -33,7 +33,6 @@ import preprocess
 import batchCustomMinHashLSH as batch_process
 
 
-
 mh, lsh = batch_process.load_mh_lsh()
 
 # Lazily instantiated global instance of SparkSession
@@ -52,41 +51,13 @@ def conver_rdd_to_df(rdd, input_schema):
     return  spark.createDataFrame(rdd, input_schema)
 
 
-# Store news data
-def store_lsh_redis_by_tag(rdd):
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-    if config.LOG_DEBUG: print("store minhash and lsh by company tag")
-    for q in rdd:
-        q_json = json.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
-                    "lsh_hash": q.lsh_hash, "timestamp": q.timestamp })
-        try:
-            for tag in q.tag_company:
-                rdb.zadd("lsh:{0}".format(tag), q.timestamp, q_json)
-                rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
-        except Exception as e:
-            print("ERROR: failed to save tag {0} to Redis".format(tag))
-
-
-
-def compute_minhash_lsh(df):
-    calc_min_hash = udf(lambda x: list(map(lambda x: int(x), mh.calc_min_hash_signature(x))), ArrayType(IntegerType()))
-    calc_lsh_hash = udf(lambda x: list(map(lambda x: int(x), lsh.find_lsh_buckets(x))), ArrayType(IntegerType()))
-
-    df = df.withColumn("min_hash", calc_min_hash("text_body_stemmed"))
-    df = df.withColumn("lsh_hash", calc_lsh_hash("min_hash"))
-
-    #if config.LOG_DEBUG: print(df.first())
-    #df.foreachPartition(store_lsh_redis_by_tag)
-    return df
-
-
 def save2redis(iter, news):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     token = "dup_cand:{}".format(news['id']) # id
     for entry in iter:
         processed_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-        dup = tuple(news['headline'], news['timestamp'], entry.id, entry.headline,
-                        entry.timestamp, news['ingest_timestamp'], processed_timestamp)
+        dup = tuple([news['headline'], news['timestamp'], entry.id, entry.headline, entry.timestamp,
+                    news['ingest_timestamp'], processed_timestamp])
         rdb.zadd(token, entry.jaccard_sim, dup)
 
 
