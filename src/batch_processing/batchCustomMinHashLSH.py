@@ -81,7 +81,7 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
             temp1 = rdb.hget("jacc_sim", '{}:{}'.format(_b_id, _s_id))
             temp2 = rdb.hget("jacc_sim", '{}:{}'.format(_b_id, _s_id))
             if temp1 is not None:
-                rdb.sadd("dup_cand:{}".format(_b_id), _sid)
+                rdb.sadd("dup_cand:{}".format(_b_id), _s_id)
             elif temp2 is not None:
                 rdb.sadd("dup_cand:{}".format(_s_id), _b_id)
             else:
