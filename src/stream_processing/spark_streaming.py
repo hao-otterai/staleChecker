@@ -2,7 +2,7 @@ import os
 import sys
 import redis
 import json
-import datetime
+from datetime import datetime
 import time
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages org.apache.spark:spark-streaming-kafka-0-8_2.11:2.2.0 pyspark-shell"
@@ -84,7 +84,7 @@ def save2redis(iter, news):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     token = "dup_cand:{}".format(news['id']) # id
     for entry in iter:
-        processed_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+        processed_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
         dup = tuple(news['headline'], news['timestamp'], entry.id, entry.headline,
                         entry.timestamp, news['ingest_timestamp'], processed_timestamp)
         rdb.zadd(token, entry.jaccard_sim, dup)
@@ -141,7 +141,7 @@ def process_news(news):
 #         rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 #         token = "dup_cand:{}".format(news.id)
 #         for entry in iter:
-#             processed_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+#             processed_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
 #             dup = tuple(news.headline, news.timestamp, entry.id, entry.headline,
 #                             entry.timestamp, entry.ingest_timestamp, processed_timestamp)
 #             rdb.zadd(token, entry.jaccard_sim, dup)
@@ -175,11 +175,13 @@ def process_news(news):
 #             print(e)
 
 
-def process_mini_batch(iter):
-    for news in iter:
+def process_mini_batch(rdd):
+    if config.LOG_DEBUG: print("process_mini_batch")
+    # rdd.foreachPartition(process_mini_batch)
+    for news in rdd.collect():
         if len(news) > 0:
-            if config.LOG_DEBUG: print('process_mini_batch')
-            process_news(news)
+            print(news)
+            #process_news(news)
 
 
 
@@ -212,14 +214,14 @@ def main():
     #input_schema = StructType([StructField(field, StringType(), nullable = True) for field in config.INPUT_SCHEMA_FIELDS])
 
     def _ingest_timestamp(data):
-        data['ingest_timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+        data['ingest_timestamp'] = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
         return data
 
-    kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda x: _ingest_timestamp(x))\
-        .foreachRDD(lambda rdd: rdd.foreachPartition(process_mini_batch))
+    kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda data: _ingest_timestamp(data))\
+        .foreachRDD(lambda rdd: process_mini_batch)
 
-    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda x: _ingest_timestamp(x))\
-    #     .foreachRDD(lambda rdd: rdd.foreachPartition(lambda x: process_mini_batch(x, mh, lsh)))
+    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda data: _ingest_timestamp(data))\
+    #     .foreachRDD(lambda rdd: rdd.foreachPartition(process_mini_batch))
 
     ssc.start()
     ssc.awaitTermination()
