@@ -67,7 +67,7 @@ def save2redis(iter, news):
 def process_news(news):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
-    #if config.LOG_DEBUG: print('process_news: {}'.format(news))
+    if config.LOG_DEBUG: print('process_news: {}'.format(news))
 
     q_timestamp = long(news['timestamp'])
     q_mh = mh.calc_min_hash_signature(news['text_body_stemmed']) #

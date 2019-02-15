@@ -31,7 +31,7 @@ class Producer(threading.Thread):
         'source', 'tag_company', 'text_body', 'text_body_stemmed', 'timestamp']
         for line in json_file:
             js = dict(zip(fields, line))
-            if config.LOG_DEBUG: print(js['headline'])
+            if config.LOG_DEBUG: print(js['headline'], js['tag_company'])
             producer.send(config.KAFKA_TOPIC, js)
             time.sleep(config.KAFKA_CONSUMER_REFRESH)
 
