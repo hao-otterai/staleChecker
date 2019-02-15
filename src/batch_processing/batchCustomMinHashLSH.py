@@ -156,7 +156,7 @@ def find_similar_cands_per_tag(tag, mh, lsh):
     df = sql_context.read.json(sc.parallelize(tq))
 
     def _convert_hash_string_to_list(x):
-        return [x[0],  [int(i) for i in x[1].split(',')], x[2], x[3],  [int(i) for i in x[4].split(',')]]
+        return [x[0],  [long(i) for i in x[1].split(',')], x[2], x[3],  [int(i) for i in x[4].split(',')]]
 
     rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'),
         col('timestamp'), col('lsh_hash')).rdd.map(lambda x: _convert_hash_string_to_list(x)).flatMap(
