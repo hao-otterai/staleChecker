@@ -90,8 +90,6 @@ def get_jaccard_similarity(candidate_set):
 
         if config.LOG_DEBUG: print(_b_set, _s_set)
 
-        _similar_dict[(_b_set[0],_b_set[2],_b_set[3])] = []
-
         #calculate jaccard similarity and update redis cache
         # jaccard_sim_token = '{}:{}'.format(_b_set[0], _s_set[0])
         # _jaccard_similarity = rdb.hget("jacc_sim", jaccard_sim_token)
@@ -103,12 +101,15 @@ def get_jaccard_similarity(candidate_set):
         # Store the result and get top NUM_OF_MOST_SIMILAR_SET similar sets
         _jaccard_similarity = float(_jaccard_similarity)
         if _jaccard_similarity > config.DUP_QUESTION_MIN_HASH_THRESHOLD:
-            _similar_dict[(_b_set[0],_b_set[2],_b_set[3])].append([_jaccard_similarity, (_s_set[0],_s_set[2],_s_set[3]) ])
+            if (_b_set[0],_b_set[2],_b_set[3]) not in _similar_dict:
+                _similar_dict[(_b_set[0],_b_set[2],_b_set[3])] = []
+            else:
+                _similar_dict[(_b_set[0],_b_set[2],_b_set[3])].append([_jaccard_similarity, (_s_set[0],_s_set[2],_s_set[3]) ])
 
     # filter and select top similar set.
     # _similar_dict = dict( [(k,sorted(v, key=lambda x: (x[0],-x[1][2]), reverse=True)[:config.NUM_OF_MOST_SIMILAR_SET])
     #                     for k,v in _similar_dict.items() if len(v)>0])
-    
+
     #if config.LOG_DEBUG: print('get_jaccard_similarity=> _similar_dict=%s'%(_similar_dict))
     #end_time = time.time()
     #if config.LOG_DEBUG: print("get_jaccard_similarity run time (seconds): {0} seconds".format(end_time - start_time))
@@ -136,7 +137,7 @@ def _store_similar_cands_redis(similar_dict):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for cand in similar_dict:
         for sim in similar_dict[cand]:
-            context = tuple(cand[1:] + sim[1] + [sim[0]])
+            context = tuple(cand[1:] + sim[1] + (sim[0],))
             # Store order by jaccard_sim_score
             #rdb.zadd("dup_cand:{}".format(cand[0]), sim[0], val)
             rdb.sadd("dup_cand:{}".format(cand[0]), context)
@@ -163,12 +164,10 @@ def find_similar_cands_per_tag(tag, mh, lsh):
         col('timestamp'), col('lsh_hash')).rdd.map(lambda x: _convert_hash_string_to_list(x)).flatMap(
         lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])]) for band, hash in enumerate(x[4]))).reduceByKey(
         lambda a, b: _custom_extend(a,b)).filter(lambda t: len(t[1])>1).map(lambda t: tuple(t[1]))
-
-    if config.LOG_DEBUG: print('rdd_common_bucket: ', rdd_common_bucket.first())
+    #if config.LOG_DEBUG: print('rdd_common_bucket: ', rdd_common_bucket.first())
 
     rdd_cands = rdd_common_bucket.map(lambda cand_set: get_jaccard_similarity(cand_set))
-
-    if config.LOG_DEBUG: print('rdd_cands: ', rdd_cands.first())
+    #if config.LOG_DEBUG: print('rdd_cands: ', rdd_cands.first())
 
     similar_dict = rdd_cands.flatMap(lambda x: x.items()).reduceByKey(
             lambda acc, val: _merge_result(acc, val)).collectAsMap()
