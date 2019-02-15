@@ -96,7 +96,7 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
                     b_id, s_id = _s_id, _b_id
                 else:
                     base, sim = _base, _sim
-                    b_id, s_id = _b_id, s_id
+                    b_id, s_id = _b_id, _s_id
 
                 #calculate jaccard similarity and update redis cache
                 jacc_sim = util.jaccard_sim_score(base['lsh_hash'], sim['lsh_hash'])
