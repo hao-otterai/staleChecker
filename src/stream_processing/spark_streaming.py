@@ -91,7 +91,7 @@ def test_func(news,  mh, lsh):
         for entry in iter:
             processed_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
             dup = tuple(news['headline'], news['timestamp'], entry.id, entry.headline,
-                            entry.timestamp, entry.ingest_timestamp, processed_timestamp)
+                            entry.timestamp, news['ingest_timestamp'], processed_timestamp)
             rdb.zadd(token, entry.jaccard_sim, dup)
 
     """
@@ -102,7 +102,7 @@ def test_func(news,  mh, lsh):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
     q_id = news[5] # 'id'
-    q_timestamp = long(news[-1])
+    q_timestamp = long(news[10])
     q_mh = mh.calc_min_hash_signature(news[9]) #'text_body_stemmed'
     q_lsh = lsh.find_lsh_buckets(q_mh)
     tags = news[7]  # tags
@@ -111,7 +111,8 @@ def test_func(news,  mh, lsh):
     max_tag_table_size = 0
 
     # Store tag + news in Redis
-    q_json = json.dumps({"id": q_id, "headline": news[3], "min_hash": tuple(q_mh), "lsh_hash": tuple(q_lsh), "timestamp": q_timestamp})
+    q_json = json.dumps({"id": q_id, "headline": news[3], "min_hash": tuple(q_mh),
+                        "lsh_hash": tuple(q_lsh), "timestamp": q_timestamp})
     for tag in tags:
         rdb.zadd("lsh:{0}".format(tag), q_timestamp, q_json)
         rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
@@ -133,7 +134,7 @@ def test_func(news,  mh, lsh):
         filtered_df.count().map(lambda x: "{} similar news found".format(x))
 
     filtered_df.foreachPartition(lambda iter: _helper_save2redis(iter,
-            {"id": news[5], "headline": news[3], "timestamp": q_timestamp}))
+            {"id": news[5], "headline": news[3], "timestamp": q_timestamp, 'ingest_timestamp': news[11] }))
 
     # tq_table = rdb.zrevrange("lsh:{0}".format(tag), 0, config.MAX_QUESTION_COMPARISON, withscores=False)
     # tq = [json.loads(tq_entry) for tq_entry in tq_table]
@@ -266,9 +267,8 @@ def main():
         lsh = util.load_pickle_file(config.LSH_PICKLE)
     if config.LOG_DEBUG: print('mh and lsh init finished')
 
-    def _ingest_timestamp(data):
-        data["ingest_timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-        return data
+    def _ingest_timestamp(dlist):
+        return dlist.append(datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p"))
 
     dstream = kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda x: _ingest_timestamp(x))
     count_mini_batch = dstream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
