@@ -13,4 +13,4 @@ src/batch_processing/spark_warehouse
 src/config/__pycache__
 src/stream_processing/__pycache__
 src/batch_processing/__pycache__
-
+src/**/*.pyc

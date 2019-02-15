@@ -7,3 +7,4 @@ rm -rf batch_processing/spark_warehouse
 rm -rf config/__pycache__
 rm -rf stream_processing/__pycache__
 rm -rf batch_processing/__pycache__
+rm **/*.pyc
