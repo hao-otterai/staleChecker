@@ -85,7 +85,8 @@ def get_jaccard_similarity(candidate_set):
     #if config.LOG_DEBUG: print('get_jaccard_similarity=>candidate_set=%s'%(str(candidate_set)))
     for _b_set, _s_set in itertools.permutations(candidate_set,2):
 
-        if _b_set[3] < _s_set[3] or _b_set[3] > (_s_set[3] + config.TIME_WINDOW):
+        print("bset and sset", _b_set, _s_set)
+        if long(_b_set[3]) < long(_s_set[3]) or long(_b_set[3]) > (long(_s_set[3]) + config.TIME_WINDOW):
             continue
 
         if config.LOG_DEBUG: print(_b_set, _s_set)
