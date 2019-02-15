@@ -79,8 +79,7 @@ def get_jaccard_similarity(candidate_set):
     create base set and its similar sets in a dictionary.
     return = {base_set:(similar_set:jaccard_similarity, )}
     """
-    if config.LOG_DEBUG: print(candidate_set)
-
+    #start_time = time.time()
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     _similar_dict = {}
     #if config.LOG_DEBUG: print('get_jaccard_similarity=>candidate_set=%s'%(str(candidate_set)))
@@ -166,10 +165,8 @@ def find_similar_cands_per_tag(tag, mh, lsh):
 
     if config.LOG_DEBUG: print('rdd_common_bucket: ', rdd_common_bucket.first())
 
-    #rdd_cands = rdd_common_bucket.mapPartitions(lambda rdd: rdd.foreach(get_jaccard_similarity))
-    def testf(iterator):
-        yield get_jaccard_similarity(iterator)
-    rdd_cands = rdd_common_bucket.foreachPartition(testf)
+    rdd_cands = rdd_common_bucket.map(lambda cand_set: get_jaccard_similarity(cand_set))
+
     if config.LOG_DEBUG: print('rdd_cands: ', rdd_cands.first())
 
     similar_dict = rdd_cands.flatMap(lambda x: x.items()).reduceByKey(
