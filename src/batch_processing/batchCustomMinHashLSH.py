@@ -41,8 +41,8 @@ def load_mh_lsh():
 
 
 # Store news data
-def store_lsh_redis_by_tag(iter, rdb):
-    #rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+def store_lsh_redis_by_tag(iter):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     if config.LOG_DEBUG: print("store minhash and lsh by company tag")
     for q in iter:
         #if config.LOG_DEBUG: print(q)
@@ -66,8 +66,8 @@ def compute_minhash_lsh(df, mh, lsh):
     df = df.withColumn("lsh_hash", calc_lsh_hash("min_hash"))
 
     #if config.LOG_DEBUG: print(df.first())
-    #df.foreachPartition(store_lsh_redis_by_tag)
-    df.foreachPartition(lambda iter, rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0): store_lsh_redis_by_tag(iter, rdb))
+    df.foreachPartition(store_lsh_redis_by_tag)
+    #df.foreachPartition(lambda iter, rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0): store_lsh_redis_by_tag(iter, rdb))
     return df
 
 
