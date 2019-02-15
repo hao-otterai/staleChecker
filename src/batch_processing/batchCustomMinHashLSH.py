@@ -167,7 +167,9 @@ def find_similar_cands_per_tag(tag, mh, lsh):
     if config.LOG_DEBUG: print('rdd_common_bucket: ', rdd_common_bucket.first())
 
     #rdd_cands = rdd_common_bucket.mapPartitions(lambda rdd: rdd.foreach(get_jaccard_similarity))
-    rdd_cands = rdd_common_bucket.foreachPartition(lambda rdd: rdd.map(lambda x: get_jaccard_similarity(x)))
+    def testf(iterator):
+        yield get_jaccard_similarity(iterator)
+    rdd_cands = rdd_common_bucket.foreachPartition(testf)
     if config.LOG_DEBUG: print('rdd_cands: ', rdd_cands.first())
 
     similar_dict = rdd_cands.flatMap(lambda x: x.items()).reduceByKey(
