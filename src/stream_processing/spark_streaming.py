@@ -180,8 +180,8 @@ def process_mini_batch(rdd):
     # rdd.foreachPartition(process_mini_batch)
     for news in rdd.collect():
         if len(news) > 0:
-            print(news)
-            #process_news(news)
+            #print(news)
+            process_news(news)
 
 
 
