@@ -52,7 +52,6 @@ def conver_rdd_to_df(rdd, input_schema):
 
 
 def save2redis(iter, news):
-
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     token = "dup_cand:{}".format(news['id'])
     for entry in iter:
