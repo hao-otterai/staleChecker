@@ -66,7 +66,7 @@ def compute_minhash_lsh(df, mh, lsh):
 
     #if config.LOG_DEBUG: print(df.first())
     #df.foreachPartition(store_lsh_redis_by_tag)
-    df.mapPartitions(lambda iter, rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0): store_lsh_redis_by_tag(iter, rdb))
+    df.foreachPartition(lambda iter, rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0): store_lsh_redis_by_tag(iter, rdb))
     return df
 
 
