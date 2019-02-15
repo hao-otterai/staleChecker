@@ -109,6 +109,33 @@ def get_jaccard_similarity(candidate_set):
     return _similar_dict
 
 
+def _custom_extend(a,b): # both a, b are list
+    a.extend(b)
+    return a
+
+def _merge_result(acc_list, value_list):
+    # Remove redundant similar sets from each partitions
+    output = []
+    for _v in value_list+acc_list:
+        if _v not in output: output.append(_v)
+        #if config.LOG_DEBUG > 1: print('LSH.get_merge_result=> _final_dict=%s'%(_final_dict))
+    return output
+
+def _store_similar_cands_redis(similar_dict):
+    """
+    input - similar_dict:
+        key: (id, headline, timestamp)
+        val: [jaccard_sim,  (id, headline, timestamp)]
+    """
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    for cand in similar_dict:
+        for sim in similar_dict[cand]:
+            context = tuple(cand[1:] + sim[1] + [sim[0]])
+            # Store order by jaccard_sim_score
+            #rdb.zadd("dup_cand:{}".format(cand[0]), sim[0], val)
+            rdb.sadd("dup_cand:{}".format(cand[0]), context)
+
+
 # Compares LSH signatures, MinHash signature, and find duplicate candidates
 # Fetch all news. ideally, sort the news by timestamp, and get within a range of timestamps
 def find_similar_cands_per_tag(tag, mh, lsh):
@@ -124,53 +151,23 @@ def find_similar_cands_per_tag(tag, mh, lsh):
     if config.LOG_DEBUG: print("tag {0}: {1} news".format(tag, len(tq)))
     df = sql_context.read.json(sc.parallelize(tq))
 
-    # find set of news ids which have at least one common lsh bucket
-    #if config.LOG_DEBUG: df.printSchema()
-    def _custom_extend(a,b): # both a, b are list
-        a.extend(b)
-        return a
+    def _convert_hash_string_to_list(x):
+        x[1] = [int(i) for i in x[1].split(',')]
+        x[4] = [int(i) for i in x[4].split(',')]
+        return x
 
-    def _merge_result(acc_list, value_list):
-        # Remove redundant similar sets from each partitions
-        output = []
-        for _v in value_list+acc_list:
-            if _v not in output: output.append(_v)
-            #if config.LOG_DEBUG > 1: print('LSH.get_merge_result=> _final_dict=%s'%(_final_dict))
-        return output
+    rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'),
+        col('timestamp'), col('lsh_hash')).rdd.map(lambda x: _convert_hash_string_to_list(x)).flatMap(
+        lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])])
+                for band, hash in enumerate(x[4]))).reduceByKey(
+        lambda a, b: _custom_extend(a,b)).filter(lambda x: len(x[1])>1).map(lambda x: tuple(x[1]))
 
-    def _store_similar_cands_redis(similar_dict):
-        """
-        input - similar_dict:
-            key: (id, headline, timestamp)
-            val: [jaccard_sim,  (id, headline, timestamp)]
-        """
-        rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-        for cand in similar_dict:
-            for sim in similar_dict[cand]:
-                context = tuple(cand[1:] + sim[1] + [sim[0]])
-                # Store order by jaccard_sim_score
-                #rdb.zadd("dup_cand:{}".format(cand[0]), sim[0], val)
-                rdb.sadd("dup_cand:{}".format(cand[0]), context)
+    rdd_cands = rdd_common_bucket.map(lambda cand_set: get_jaccard_similarity(cand_set))
 
-    try:
-        rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'),
-            col('timestamp'), col('lsh_hash')).rdd.flatMap(
-            lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])])
-                    for band, hash in enumerate(x[4]))).reduceByKey(
-            lambda a, b: _custom_extend(a,b)).filter(lambda x: len(x[1])>1).map(lambda x: tuple(x[1]))
-        #if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_common_bucket.collect()))
-
-        rdd_cands = rdd_common_bucket.map(lambda cand_set: get_jaccard_similarity(cand_set))
-        #if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(rdd_cands.first()))
-
-        similar_dict = rdd_cands.flatMap(lambda x: x.items()).reduceByKey(
-                lambda acc, val: _merge_result(acc, val)).collectAsMap()
-        if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_dict))
-        _store_similar_cands_redis(similar_dict)
-
-    except Exception as e:
-        print("error getting similar news for tag {}".format(tag), e )
-
+    similar_dict = rdd_cands.flatMap(lambda x: x.items()).reduceByKey(
+            lambda acc, val: _merge_result(acc, val)).collectAsMap()
+    if config.LOG_DEBUG: print("find_similar_cands_lsh ==> {}".format(similar_dict))
+    _store_similar_cands_redis(similar_dict)
 
 
 
