@@ -11,6 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/preprocess")
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/batch_processing")
 
+
 from pyspark import SparkContext
 from pyspark.conf import SparkConf
 from pyspark.streaming import StreamingContext
@@ -83,7 +84,6 @@ def test_process_mini_batch(rdd, mh, lsh):
 
 
 def test_func(news,  mh, lsh):
-
     # # Store similar candidates in Redis
     def _helper_save2redis(iter, news):
         rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
@@ -270,10 +270,11 @@ def main():
     def _ingest_timestamp(dlist):
         return dlist.append(datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p"))
 
-    dstream = kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda x: _ingest_timestamp(x))
-    count_mini_batch = dstream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
-    #dstream.foreachRDD(lambda rdd: process_mini_batch(rdd, input_schema, mh, lsh))
-    dstream.foreachRDD(lambda rdd: rdd.foreachPartition(lambda news: test_process_mini_batch(news, mh, lsh)))
+    kafka_stream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
+
+    kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
+            lambda x: _ingest_timestamp(x)).foreachRDD(
+            lambda rdd: rdd.foreachPartition(lambda news: test_process_mini_batch(news, mh, lsh)))
 
 
     ssc.start()
