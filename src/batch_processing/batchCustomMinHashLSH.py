@@ -91,12 +91,12 @@ def get_jaccard_similarity(candidate_set):
         if config.LOG_DEBUG: print(_b_set, _s_set)
 
         #calculate jaccard similarity and update redis cache
-        # jaccard_sim_token = '{}:{}'.format(_b_set[0], _s_set[0])
-        # _jaccard_similarity = rdb.hget("jacc_sim", jaccard_sim_token)
-        # if _jaccard_similarity is None:
-        #     _jaccard_similarity = util.jaccard_sim_score(_b_set[1], _s_set[1])
-        #     rdb.hset("jacc_sim", jaccard_sim_token, _jaccard_similarity)
-        _jaccard_similarity = util.jaccard_sim_score(_b_set[1], _s_set[1])
+        jaccard_sim_token = '{}:{}'.format(_b_set[0], _s_set[0])
+        _jaccard_similarity = rdb.hget("jacc_sim", jaccard_sim_token)
+        if _jaccard_similarity is None:
+            _jaccard_similarity = util.jaccard_sim_score(_b_set[1], _s_set[1])
+            rdb.hset("jacc_sim", jaccard_sim_token, _jaccard_similarity)
+        #_jaccard_similarity = util.jaccard_sim_score(_b_set[1], _s_set[1])
 
         # Store the result and get top NUM_OF_MOST_SIMILAR_SET similar sets
         _jaccard_similarity = float(_jaccard_similarity)
@@ -134,6 +134,7 @@ def _store_similar_cands_redis(similar_dict):
         key: (id, headline, timestamp)
         val: [jaccard_sim,  (id, headline, timestamp)]
     """
+    if config.LOG_DEBUG: print("========= Saving dup_cand to Redis ===========")
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for cand in similar_dict:
         for sim in similar_dict[cand]:
@@ -158,7 +159,8 @@ def find_similar_cands_per_tag(tag, mh, lsh):
     df = sql_context.read.json(sc.parallelize(tq))
 
     def _convert_hash_string_to_list(x):
-        return [x[0],  x[1].split(','), x[2], x[3], x[4].split(',')]
+        return [x[0],  x[1].split(',') if x[1] is not None else [], x[2], x[3],
+            x[4].split(',') if x[4] is not None else [] ]
 
     rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'),
         col('timestamp'), col('lsh_hash')).rdd.map(lambda x: _convert_hash_string_to_list(x)).flatMap(
