@@ -59,32 +59,13 @@ def store_preprocessed_redis(iterator):
         #token = "preprocessed:{0}".format(news.id)
         save_content = {"headline": news.headline, "body": news.body, "timestamp": news.timestamp} #news.text_body_stemmed
         if config.LOG_DEBUG: print(save_content['headline'])
-        try:
-            rdb.zadd("newsId", news.timestamp, news.id)
-            rdb.hmset("news:{}".format(news.id), save_content)
-        except Exception as e:
-            print("ERROR: failed to save news id:{0} to Redis".format(news.id))
-    # Store news data
-    # def helper(iterator):
-    #     """
-    #     # here is a naive implementation. another option is to use the spark-redis package as following:
-    #     # df.write.format("org.apache.spark.sql.redis").option("table", "people").option("key.column", "name").save()
-    #     # loadedDf = spark.read.format("org.apache.spark.sql.redis").option("table", "people").load()
-    #     # loadedDf.show()
-    #
-    #     fields = "id, headline, body, text_body, text_body_stemmed, tag_company, source, hot, display_date, timestamp, djn_urgency"
-    #     """
-    #     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-    #     for news in iterator:
-    #         save_content = news[:2]+news[4:6]+news[9:10]
-    #         if config.LOG_DEBUG: print(save_content)
-    #         try:
-    #             #rdb.zadd("preprocessed_news:{0}".format(news_dict['id']), int(news_dict['timestamp']), json.dumps(news_dict))
-    #             rdb.zadd("preprocessed:{0}".format(news[0]), long(news[-2]), save_content)
-    #             #rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
-    #         except Exception as e:
-    #             print("ERROR: failed to save preprocessed news id:{0} to Redis".format(news[0]))
-    # df.rdd.map(list).foreachPartition(helper)
+        #try:
+        rdb.zadd("newsId", news.timestamp, news.id)
+        rdb.hmset("news:{}".format(news.id), save_content)
+        #except Exception as e:
+        #    print("ERROR: failed to save news id:{0} to Redis".format(news.id))
+
+
 
 def df_preprocess_func(df):
 
