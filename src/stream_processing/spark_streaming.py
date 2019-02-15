@@ -81,7 +81,7 @@ def process_news(news):
 
     for tag in tags:
         rdb.zadd("lsh:{0}".format(tag), q_timestamp, q_json)
-        rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
+        #rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
 
 
     tq = []

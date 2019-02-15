@@ -45,14 +45,13 @@ def store_lsh_redis_by_tag(iter):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     if config.LOG_DEBUG: print("store minhash and lsh by company tag")
     for q in iter:
-        #if config.LOG_DEBUG: print(q)
-        q_json = pickle.dumps({"id": q.id, "headline": q.headline, "min_hash": q.min_hash,
-                    "lsh_hash": q.lsh_hash, "timestamp": q.timestamp })
-
+        if config.LOG_DEBUG: print(q.headline)
+        #q_json = json.dumps({ "min_hash": q.min_hash, "lsh_hash": q.lsh_hash})
+        rdb.hmset("news:{}".format(q.id), { "min_hash": q.min_hash, "lsh_hash": q.lsh_hash})
         #if config.LOG_DEBUG: print(q_json)
         for tag in q.tag_company:
             # rdb.zadd("lsh:{}".format(tag), q.timestamp, q_json)
-            rdb.sadd("lsh:{}".format(tag), q_json)
+            rdb.sadd("lsh:{}".format(tag), q.id)
             rdb.sadd("lsh_keys", "lsh:{}".format(tag))
         #except Exception as e:
         #    print("ERROR: failed to save tag {0} to Redis".format(tag))
@@ -110,11 +109,16 @@ def get_jaccard_similarity(candidate_set):
 
 
 # Compares LSH signatures, MinHash signature, and find duplicate candidates
+# Fetch all news. ideally, sort the news by timestamp, and get within a range of timestamps
 def find_similar_cands_per_tag(tag, mh, lsh):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
-    # Fetch all news. ideally, sort the news by timestamp, and get within a range of timestamps
-    tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
+    tq = []
+    for id in rdb.smembers("lsh:{}".format(tag)):
+        news = rdb.hgetall("news:{}".format(id))
+        news['id'] = id
+        tq.append(news)
+    #tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
 
     if config.LOG_DEBUG: print("tag {0}: {1} news".format(tag, len(tq)))
     df = sql_context.read.json(sc.parallelize(tq))
@@ -142,9 +146,10 @@ def find_similar_cands_per_tag(tag, mh, lsh):
         rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
         for cand in similar_dict:
             for sim in similar_dict[cand]:
-                val = tuple(cand[1:] + sim[1])
+                context = tuple(cand[1:] + sim[1] + [sim[0]])
                 # Store order by jaccard_sim_score
-                rdb.zadd("dup_cand:{}".format(cand[0]), sim[0], val)
+                #rdb.zadd("dup_cand:{}".format(cand[0]), sim[0], val)
+                rdb.sadd("dup_cand:{}".format(cand[0]), context)
 
     try:
         rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'),
@@ -193,9 +198,8 @@ def main():
     # Fetch all tags from lsh_keys set
     for lsh_key in rdb.sscan_iter("lsh_keys", match="*", count=500):
         tag = lsh_key.replace("lsh:", "")
-        tq_table_size = rdb.zcard("lsh:{0}".format(tag))
-        if tq_table_size < 2:
-            continue
+        tq_table_size = rdb.scard("lsh:{0}".format(tag))
+        if tq_table_size < 2: continue
 
         find_similar_cands_per_tag(tag, mh, lsh)
 
