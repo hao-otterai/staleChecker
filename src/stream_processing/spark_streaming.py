@@ -218,7 +218,7 @@ def main():
         return data
 
     kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda data: _ingest_timestamp(data))\
-        .foreachRDD(lambda rdd: process_mini_batch)
+        .foreachRDD(lambda rdd: process_mini_batch(rdd))
 
     # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda data: _ingest_timestamp(data))\
     #     .foreachRDD(lambda rdd: rdd.foreachPartition(process_mini_batch))
