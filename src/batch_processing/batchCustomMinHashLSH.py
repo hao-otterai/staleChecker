@@ -160,13 +160,12 @@ def find_similar_cands_per_tag(tag, mh, lsh):
 
     rdd_common_bucket = df.select(col('id'), col('min_hash'), col('headline'),
         col('timestamp'), col('lsh_hash')).rdd.map(lambda x: _convert_hash_string_to_list(x)).flatMap(
-        lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])])
-                for band, hash in enumerate(x[4]))).reduceByKey(
+        lambda x: (((hash, band), [(x[0], x[1], x[2], x[3])]) for band, hash in enumerate(x[4]))).reduceByKey(
         lambda a, b: _custom_extend(a,b)).filter(lambda t: len(t[1])>1).map(lambda t: tuple(t[1]))
 
     if config.LOG_DEBUG: print('rdd_common_bucket: ', rdd_common_bucket.first())
 
-    rdd_cands = rdd_common_bucket.map(lambda cand_set: get_jaccard_similarity(cand_set))
+    rdd_cands = rdd_common_bucket.mapPartitions(lambda rdd: rdd.foreach(get_jaccard_similarity))
 
     if config.LOG_DEBUG: print('rdd_cands: ', rdd_cands.first())
 
