@@ -124,8 +124,7 @@ def process_news(news):
             'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
             col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
 
-    if config.LOG_DEBUG: filtered_df.count().map(lambda x: "{} similar news found".format(x))
-
+    #if config.LOG_DEBUG: filtered_df.count().map(lambda x: "{} similar news found".format(x))
     filtered_df.foreachPartition(lambda iter: save2redis(iter, news))
 
 # def process_news(iter):
