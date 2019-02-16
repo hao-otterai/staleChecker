@@ -95,7 +95,7 @@ def process_news(news):
                 news = {}
                 news['id'] = id
                 news['lsh_hash'] = [int(i) for i in temp_lsh.split(',')]
-                news['min_hash'] = [long(i) for i temp_mh.split(',')]
+                news['min_hash'] = [long(i) for i in temp_mh.split(',')]
                 tq.append(news)
             else:
                 print("Failed to get lsh_hash for news:{}".format(id))
