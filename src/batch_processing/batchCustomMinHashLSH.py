@@ -195,8 +195,9 @@ def find_similar_cands_per_tag(tag, mh, lsh):
     df = sql_context.read.json(sc.parallelize(tq))
 
     def _helperFunc(iterator):
-        for cand_set in iterator:
-            get_jacc_sim_and_save_result_redis(cand_set)
+        if iterator is not None: # avoid NoneType not iteratable error
+            for cand_set in iterator:
+                get_jacc_sim_and_save_result_redis(cand_set)
 
     rdd_common_bucket = df.select(col('id'), col('lsh_hash')).rdd.flatMap(
         lambda x: (((hash, band), [x[0]]) for band, hash in enumerate(x[1]))).reduceByKey(
