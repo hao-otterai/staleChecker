@@ -189,11 +189,16 @@ def find_similar_cands_per_tag(tag, mh, lsh):
 
     tq = []
     for id in rdb.smembers("lsh:{}".format(tag)):
-        news = rdb.hgetall("news:{}".format(id))
-        news['id'] = id
-        tq.append(news)
+        lsh_hash = rdb.hget("news:{}".format(id), 'lsh_hash')
+        if lsh_hash is not None:
+            news = {}
+            news['id'] = id
+            news['lsh_hash'] = lsh_hash.split(',')
+            tq.append(news)
+        else:
+            print("Failed to get lsh_hash for news:{}".format(id))
     #tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
-
+    if len(tq) < 2: return
     if config.LOG_DEBUG: print("tag {0}: {1} news".format(tag, len(tq)))
     df = sql_context.read.json(sc.parallelize(tq))
 
@@ -204,8 +209,7 @@ def find_similar_cands_per_tag(tag, mh, lsh):
 
     rdd_common_bucket = df.select(col('id'), col('lsh_hash')).rdd.flatMap(
         lambda x: (((hash, band), [x[0]]) for band, hash in enumerate(x[1]))).reduceByKey(
-        lambda a, b: _custom_extend(a,b)).filter(lambda x:
-        (x is not None and x[1] is not None and len(x[1])>1)).foreachPartition(_helperFunc)
+        lambda a, b: _custom_extend(a,b)).filter(lambda x: len(x[1])>1).foreachPartition(_helperFunc)
 
     # def _convert_hash_string_to_list(x):
     #     return [x[0],  x[1].split(',') if x[1] is not None else [], x[2], x[3],
