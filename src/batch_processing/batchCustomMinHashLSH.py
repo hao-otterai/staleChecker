@@ -92,15 +92,14 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
 
                 # base is a news which appear later
                 if _base['timestamp'] < _sim['timestamp']:
-                    #base, sim = _sim, _base
                     b_id, s_id = _s_id, _b_id
-                    b_min_hash = _base['min_hash']
-                    s_min_hash = _sim['min_hash']
+                    b_min_hash = _base['min_hash'].split(",")
+                    s_min_hash = _sim['min_hash'].split(",")
                 else:
-                    #base, sim = _base, _sim
                     b_id, s_id = _b_id, _s_id
-                    b_min_hash = _sim['min_hash']
-                    s_min_hash = _base['min_hash']
+                    b_min_hash = _sim['min_hash'].split(",")
+                    s_min_hash = _base['min_hash'].split(",")
+
                 #calculate jaccard similarity and update redis cache
                 jacc_sim = util.jaccard_sim_score(b_min_hash, s_min_hash)
                 rdb.hset("jacc_sim", '{}:{}'.format(b_id, s_id), jacc_sim)
@@ -182,11 +181,11 @@ def _store_similar_cands_redis(similar_dict):
             #rdb.zadd("dup_cand:{}".format(cand[0]), sim[0], val)
             rdb.sadd("dup_cand:{}".format(cand[0]), context)
 
-# Compares LSH signatures, MinHash signature, and find duplicate candidates
-# Fetch all news. ideally, sort the news by timestamp, and get within a range of timestamps
+
 def find_similar_cands_per_tag(tag, mh, lsh):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
+    # get the dataframe for all news of given tag. id and lsh_hash columns loaded from Redis.
     tq = []
     for id in rdb.smembers("lsh:{}".format(tag)):
         lsh_hash = rdb.hget("news:{}".format(id), 'lsh_hash')
@@ -197,7 +196,6 @@ def find_similar_cands_per_tag(tag, mh, lsh):
             tq.append(news)
         else:
             print("Failed to get lsh_hash for news:{}".format(id))
-    #tq = rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
     if len(tq) < 2: return
     if config.LOG_DEBUG: print("tag {0}: {1} news".format(tag, len(tq)))
     df = sql_context.read.json(sc.parallelize(tq))
