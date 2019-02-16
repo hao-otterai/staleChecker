@@ -202,7 +202,7 @@ def find_similar_cands_per_tag(tag, mh, lsh):
     rdd_common_bucket = df.select(col('id'), col('lsh_hash')).rdd.flatMap(
         lambda x: (((hash, band), [x[0]]) for band, hash in enumerate(x[1]))).reduceByKey(
         lambda a, b: _custom_extend(a,b)).filter(lambda x: len(x[1])>1).map(
-        lambda x: tuple(x[1])).foreachPartition(_helperFunc)
+        lambda x: tuple(x[1])).filter(lambda x: x is not None).foreachPartition(_helperFunc)
 
     # def _convert_hash_string_to_list(x):
     #     return [x[0],  x[1].split(',') if x[1] is not None else [], x[2], x[3],
