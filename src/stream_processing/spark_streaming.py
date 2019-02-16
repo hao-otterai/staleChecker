@@ -32,7 +32,8 @@ import min_hash
 import preprocess
 import batchCustomMinHashLSH as batch_process
 
-
+global mh
+global lsh
 mh, lsh = batch_process.load_mh_lsh()
 
 # Lazily instantiated global instance of SparkSession
@@ -88,13 +89,13 @@ def process_news(news):
     for tag in news['tag_company']:
         #tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
         for id in rdb.smembers("lsh:{}".format(tag)):
-            lsh = rdb.hget("news:{}".format(id), 'lsh_hash')
-            mh = rdb.hget("news:{}".format(id), 'min_hash')
-            if lsh is not None and mh is not None:
+            temp_lsh = rdb.hget("news:{}".format(id), 'lsh_hash')
+            temp_mh = rdb.hget("news:{}".format(id), 'min_hash')
+            if temp_lsh is not None and temp_mh is not None:
                 news = {}
                 news['id'] = id
-                news['lsh_hash'] = lsh.split(',')
-                news['min_hash'] = mh.split(',')
+                news['lsh_hash'] = temp_lsh.split(',')
+                news['min_hash'] = temp_mh.split(',')
                 tq.append(news)
             else:
                 print("Failed to get lsh_hash for news:{}".format(id))
