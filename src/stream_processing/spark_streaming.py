@@ -67,7 +67,7 @@ def save2redis(iter, news):
 def process_news(news):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
-    if config.LOG_DEBUG: print('process_news: {}'.format(news))
+    if config.LOG_DEBUG: print('process_news: {}'.format(news['headline']))
 
     q_timestamp = long(news['timestamp'])
     q_mh = mh.calc_min_hash_signature(news['text_body_stemmed'])
@@ -94,13 +94,13 @@ def process_news(news):
             if temp_lsh is not None and temp_mh is not None:
                 news = {}
                 news['id'] = id
-                news['lsh_hash'] = temp_lsh.split(',')
-                news['min_hash'] = temp_mh.split(',')
+                news['lsh_hash'] = [int(i) for i in temp_lsh.split(',')]
+                news['min_hash'] = [long(i) for i temp_mh.split(',')]
                 tq.append(news)
             else:
                 print("Failed to get lsh_hash for news:{}".format(id))
     if len(tq) < 1: return
-    if config.LOG_DEBUG: print("{} historical news in the same tag(s)".format(len(tq)))
+    if config.LOG_DEBUG: print("{0} historical news in the tag(s): {1}".format(len(tq), news['tag_company']))
     df = sql_context.read.json(sc.parallelize(tq))
 
     udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
