@@ -83,17 +83,25 @@ def process_news(news):
         rdb.sadd("lsh:{}".format(tag), news['id'])
         rdb.sadd("lsh_keys", "lsh:{}".format(tag))
 
-    # for tag in news['tag_company']:
-    #     rdb.zadd("lsh:{0}".format(tag), q_timestamp, json.dumps(news_data))
-        #rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
-
-
+    # get the dataframe for all news of given tag. id and lsh_hash columns loaded from Redis.
     tq = []
     for tag in news['tag_company']:
-        tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
+        #tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
+        for id in rdb.smembers("lsh:{}".format(tag)):
+            lsh = rdb.hget("news:{}".format(id), 'lsh_hash')
+            mh = rdb.hget("news:{}".format(id), 'min_hash')
+            if lsh is not None and mh is not None:
+                news = {}
+                news['id'] = id
+                news['lsh_hash'] = lsh.split(',')
+                news['min_hash'] = mh.split(',')
+                tq.append(news)
+            else:
+                print("Failed to get lsh_hash for news:{}".format(id))
+    if len(tq) < 1: return
     if config.LOG_DEBUG: print("{} historical news in the same tag(s)".format(len(tq)))
-
     df = sql_context.read.json(sc.parallelize(tq))
+
     udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
     udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
     filtered_df = df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
