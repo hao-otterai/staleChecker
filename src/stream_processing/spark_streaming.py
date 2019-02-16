@@ -73,7 +73,6 @@ def process_news(news):
     q_lsh = lsh.find_lsh_buckets(q_mh)
 
     # Store tag + news in Redis
-
     news_data = {"headline": news['headline'], "min_hash": tuple(q_mh),
                         "lsh_hash": tuple(q_lsh), "timestamp": q_timestamp}
     if config.LOG_DEBUG: print('save news data to Redis: {}'.format(news_data))
@@ -152,17 +151,6 @@ def process_news(news):
 #             print(e)
 
 
-def process_mini_batch(rdd):
-
-    # rdd.foreachPartition(process_mini_batch)
-    rddc =  rdd.collect()
-    if config.LOG_DEBUG: print("process_mini_batch {}".format(rddc))
-    for news in rddc:
-        if len(news) > 0:
-            #print(news)
-            process_news(news)
-
-
 
 def main():
     spark_conf = SparkConf().setAppName("Spark Streaming MinHashLSH")
@@ -197,11 +185,31 @@ def main():
         data['ingest_timestamp'] = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
         return data
 
-    kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda data: _ingest_timestamp(data))\
-        .foreachRDD(lambda rdd: process_mini_batch(rdd))
+    # def _process_mini_batch(rdd):
+    #     # rdd.foreachPartition(process_mini_batch)
+    #     rddc =  rdd.collect()
+    #     if config.LOG_DEBUG: print("process_mini_batch {}".format(rddc))
+    #     for news in rddc:
+    #         if len(news) > 0:
+    #             #print(news)
+    #             process_news(news)
+    #
+    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
+    #         lambda data: _ingest_timestamp(data)).foreachRDD(
+    #         lambda rdd: _process_mini_batch(rdd))
 
-    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(lambda data: _ingest_timestamp(data))\
-    #     .foreachRDD(lambda rdd: rdd.foreachPartition(process_mini_batch))
+    def _process_mini_batch(iterator):
+        if iterator is None:
+            return
+        if config.LOG_DEBUG:
+            print("===========_process_mini_batch===========")
+        for news in iterator:
+            if len(news) > 0:
+                process_news(news)
+
+    kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
+            lambda data: _ingest_timestamp(data)).foreachRDD(
+            lambda rdd: rdd.foreachPartition(_process_mini_batch))
 
     ssc.start()
     ssc.awaitTermination()

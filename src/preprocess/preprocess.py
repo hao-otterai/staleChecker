@@ -56,7 +56,10 @@ def generate_tag(input_string):
 def store_preprocessed_redis(iterator):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for news in iterator:
-        save_content = {"headline": news.headline, "body": news.body, "timestamp": news.timestamp} 
+        save_content = {"headline": news.headline,
+                        "body": news.body,
+                        "timestamp": news.timestamp,
+                        "tag_company": ",".join(news.tag_company)}
         if config.LOG_DEBUG:
             print(save_content['headline'])
         rdb.sadd("newsId", news.id)
