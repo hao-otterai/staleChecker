@@ -185,31 +185,31 @@ def main():
         data['ingest_timestamp'] = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
         return data
 
-    # def _process_mini_batch(rdd):
-    #     # rdd.foreachPartition(process_mini_batch)
-    #     rddc =  rdd.collect()
-    #     if config.LOG_DEBUG: print("process_mini_batch {}".format(rddc))
-    #     for news in rddc:
-    #         if len(news) > 0:
-    #             #print(news)
-    #             process_news(news)
-    #
-    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
-    #         lambda data: _ingest_timestamp(data)).foreachRDD(
-    #         lambda rdd: _process_mini_batch(rdd))
-
-    def _process_mini_batch(iterator):
-        if iterator is None:
-            return
-        if config.LOG_DEBUG:
-            print("===========_process_mini_batch===========")
-        for news in iterator:
+    def _process_mini_batch(rdd):
+        # rdd.foreachPartition(process_mini_batch)
+        rddc =  rdd.collect()
+        if config.LOG_DEBUG: print("process_mini_batch {}".format(rddc))
+        for news in rddc:
             if len(news) > 0:
+                #print(news)
                 process_news(news)
 
     kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
             lambda data: _ingest_timestamp(data)).foreachRDD(
-            lambda rdd: rdd.foreachPartition(_process_mini_batch))
+            lambda rdd: _process_mini_batch(rdd))
+
+    # def _process_mini_batch(iterator):
+    #     if iterator is None:
+    #         return
+    #     if config.LOG_DEBUG:
+    #         print("===========_process_mini_batch===========")
+    #     for news in iterator:
+    #         if len(news) > 0:
+    #             process_news(news)
+    #
+    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
+    #         lambda data: _ingest_timestamp(data)).foreachRDD(
+    #         lambda rdd: rdd.foreachPartition(_process_mini_batch))
 
     ssc.start()
     ssc.awaitTermination()
