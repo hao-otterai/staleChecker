@@ -92,21 +92,24 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
 
                 # base is a news which appear later
                 if _base['timestamp'] < _sim['timestamp']:
-                    base, sim = _sim, _base
+                    #base, sim = _sim, _base
                     b_id, s_id = _s_id, _b_id
+                    b_min_hash = _base['min_hash']
+                    s_min_hash = _sim['min_hash']
                 else:
-                    base, sim = _base, _sim
+                    #base, sim = _base, _sim
                     b_id, s_id = _b_id, _s_id
-
+                    b_min_hash = _sim['min_hash']
+                    s_min_hash = _base['min_hash']
                 #calculate jaccard similarity and update redis cache
-                jacc_sim = util.jaccard_sim_score(base['lsh_hash'], sim['lsh_hash'])
+                jacc_sim = util.jaccard_sim_score(b_min_hash, s_min_hash)
                 rdb.hset("jacc_sim", '{}:{}'.format(b_id, s_id), jacc_sim)
 
                 # if jaccard_sim is above threshold, save as dup_cand to Redis
                 if jacc_sim > config.DUP_QUESTION_MIN_HASH_THRESHOLD:
                     rdb.sadd("dup_cand:{}".format(b_id), s_id)
                     if config.LOG_DEBUG:
-                        print('Dup candidate {}-{}: {}'.format( base['headline'], sim['headline'], jacc_sim))
+                        print('Dup candidate {}-{}: {}'.format( _base['headline'], _sim['headline'], jacc_sim))
 
 
 def get_jaccard_similarity(candidate_set):
