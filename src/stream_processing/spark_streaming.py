@@ -19,13 +19,13 @@ from pyspark.ml.feature import StopWordsRemover, Tokenizer
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib")
-#sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/preprocess")
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/preprocess")
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/batch_processing")
 import config
 import util
-#import locality_sensitive_hash
-#import min_hash
-#import preprocess
+import locality_sensitive_hash
+import min_hash
+import preprocess
 import batchCustomMinHashLSH as batch_process
 
 
@@ -181,11 +181,11 @@ def main():
     spark_conf = SparkConf().setAppName("Spark Streaming MinHashLSH")
     global sc
     sc = SparkContext(conf=spark_conf)
-    #sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/locality_sensitive_hash.py")
-    #sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/min_hash.py")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/locality_sensitive_hash.py")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/min_hash.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/util.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
-    #sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/preprocess/preprocess.py")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/preprocess/preprocess.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/batch_processing/batchCustomMinHashLSH.py")
 
     global sql_context
