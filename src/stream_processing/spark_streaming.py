@@ -63,7 +63,7 @@ def save2redis(iter, news):
 def process_news(news):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     if config.LOG_DEBUG:
-        print('process_news: {}'.format(news['headline']))
+        print('========= process_news: {} ======='.format(news['headline']))
 
     q_timestamp = int(news['timestamp'])
     q_mh = mh.calc_min_hash_signature(news['text_body_stemmed'])
@@ -105,19 +105,20 @@ def process_news(news):
 
 
     """ Store tag + news in Redis """
-    news_data = {
-                    "headline": news['headline'],
-                    "min_hash": ",".join([str(i) for i in q_mh]),
-                    "lsh_hash": ",".join([str(i) for i in q_lsh]),
-                    "timestamp": q_timestamp
-                }
-    if config.LOG_DEBUG:
-        print('save news data to Redis: {}'.format(news_data['headline']))
-    rdb.hmset("news:{}".format(news['id']), news_data)
+    if config.LOG_DEBUG: print('========== Save news data to Redis =============')
     for tag in news['tag_company']:
         # rdb.zadd("lsh:{}".format(tag), q.timestamp, json.dumps(news_data))
         rdb.sadd("lsh:{}".format(tag), news['id'])
         rdb.sadd("lsh_keys", "lsh:{}".format(tag))
+    news_data = {
+                    "headline": news['headline'],
+                    "min_hash": ",".join([str(i) for i in q_mh]),
+                    "lsh_hash": ",".join([str(i) for i in q_lsh]),
+                    "timestamp": q_timestamp,
+                    "tag_company": ",".join(news["tag_company"])
+                }
+    rdb.hmset("news:{}".format(news['id']), news_data)
+
 
 
 

@@ -76,7 +76,7 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for idx, _b_id in enumerate(candidate_set):
         _base = rdb.hgetall('news:{}'.format(_b_id))
-        _base['timestamp'] = long(_base['timestamp'])
+        _base['timestamp'] = int(_base['timestamp'])
         for _s_id in candidate_set[idx+1:]:
             temp1 = rdb.hget("jacc_sim", '{}:{}'.format(_b_id, _s_id))
             temp2 = rdb.hget("jacc_sim", '{}:{}'.format(_b_id, _s_id))
@@ -86,7 +86,7 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
                 rdb.sadd("dup_cand:{}".format(_s_id), _b_id)
             else:
                 _sim  = rdb.hgetall('news:{}'.format(_s_id))
-                _sim['timestamp'] = long(_sim['timestamp'])
+                _sim['timestamp'] = int(_sim['timestamp'])
                 if abs(_base['timestamp'] - _sim['timestamp']) > config.TIME_WINDOW:
                     continue
 
@@ -123,7 +123,7 @@ def get_jaccard_similarity(candidate_set):
     #if config.LOG_DEBUG: print('get_jaccard_similarity=>candidate_set=%s'%(str(candidate_set)))
     for _b_set, _s_set in itertools.permutations(candidate_set,2):
 
-        if long(_b_set[3]) < long(_s_set[3]) or long(_b_set[3]) > (long(_s_set[3]) + config.TIME_WINDOW):
+        if int(_b_set[3]) < int(_s_set[3]) or int(_b_set[3]) > (int(_s_set[3]) + config.TIME_WINDOW):
             continue
 
         if config.LOG_DEBUG: print(_b_set, _s_set)
@@ -203,7 +203,10 @@ def find_similar_cands_per_tag(tag, mh, lsh):
     def _helperFunc(iterator):
         for cand in iterator:
             if cand[1] is not None and len(cand[1]) > 1:
-                get_jacc_sim_and_save_result_redis(cand[1])
+                try:
+                    get_jacc_sim_and_save_result_redis(cand[1])
+                except Exception as e:
+                    print("Error saving jaccard_sim result to Redis: {}".format(e))
 
     rdd_common_bucket = df.select(col('id'), col('lsh_hash')).rdd.flatMap(
         lambda x: (((hash, band), [x[0]]) for band, hash in enumerate(x[1]))).reduceByKey(
