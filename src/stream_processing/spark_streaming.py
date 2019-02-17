@@ -62,52 +62,52 @@ def process_news(news, mh, lsh):
     """
     get the dataframe for all news of given tag. id and lsh_hash columns loaded from Redis.
     """
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-    tq = []
-    for tag in news['tag_company']:
-        #tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
-        for id in rdb.smembers("lsh:{}".format(tag)):
-            temp_lsh       = rdb.hget("news:{}".format(id), 'lsh_hash')
-            temp_mh        = rdb.hget("news:{}".format(id), 'min_hash')
-            temp_timestamp = rdb.hget("news:{}".format(id), 'timestamp')
-            if temp_lsh is not None and temp_mh is not None:
-                temp = {}
-                temp['id'] = id
-                temp['lsh_hash'] = [int(i) for i in temp_lsh.split(',')]
-                temp['min_hash'] = [int(i) for i in temp_mh.split(',')]
-                temp['timestamp'] = int(temp_timestamp)
-                tq.append(temp)
-            else:
-                print("Failed to get lsh_hash for news:{}".format(id))
-    if len(tq) < 1: return
-    if config.LOG_DEBUG: print("{0} historical news in the tag(s): {1}".format(len(tq), news['tag_company']))
-    df = sql_context.read.json(sc.parallelize(tq))
-
-    udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
-    udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
-    filtered_df = df.filter((col('timestamp') > (q_timestamp-config.TIME_WINDOW)) & (col('timestamp') < q_timestamp))\
-            .withColumn('common_buckets', udf_num_common_buckets('lsh_hash'))\
-            .filter( col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT)\
-            .withColumn( 'jaccard_sim', udf_get_jaccard_similarity('min_hash'))\
-            .filter( col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
-    #if config.LOG_DEBUG: filtered_df.count().map(lambda x: "{} similar news found".format(x))
-    filtered_df.foreachPartition(lambda iter: save2redis(iter, news))
-
-
-    """ Store tag + news in Redis """
-    if config.LOG_DEBUG: print('========== Save news data to Redis =============')
-    for tag in news['tag_company']:
-        # rdb.zadd("lsh:{}".format(tag), q.timestamp, json.dumps(news_data))
-        rdb.sadd("lsh:{}".format(tag), news['id'])
-        rdb.sadd("lsh_keys", "lsh:{}".format(tag))
-    news_data = {
-                    "headline": news['headline'],
-                    "min_hash": ",".join([str(i) for i in q_mh]),
-                    "lsh_hash": ",".join([str(i) for i in q_lsh]),
-                    "timestamp": q_timestamp,
-                    "tag_company": ",".join(news["tag_company"])
-                }
-    rdb.hmset("news:{}".format(news['id']), news_data)
+    # rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    # tq = []
+    # for tag in news['tag_company']:
+    #     #tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
+    #     for id in rdb.smembers("lsh:{}".format(tag)):
+    #         temp_lsh       = rdb.hget("news:{}".format(id), 'lsh_hash')
+    #         temp_mh        = rdb.hget("news:{}".format(id), 'min_hash')
+    #         temp_timestamp = rdb.hget("news:{}".format(id), 'timestamp')
+    #         if temp_lsh is not None and temp_mh is not None:
+    #             temp = {}
+    #             temp['id'] = id
+    #             temp['lsh_hash'] = [int(i) for i in temp_lsh.split(',')]
+    #             temp['min_hash'] = [int(i) for i in temp_mh.split(',')]
+    #             temp['timestamp'] = int(temp_timestamp)
+    #             tq.append(temp)
+    #         else:
+    #             print("Failed to get lsh_hash for news:{}".format(id))
+    # if len(tq) < 1: return
+    # if config.LOG_DEBUG: print("{0} historical news in the tag(s): {1}".format(len(tq), news['tag_company']))
+    # df = sql_context.read.json(sc.parallelize(tq))
+    #
+    # udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
+    # udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
+    # filtered_df = df.filter((col('timestamp') > (q_timestamp-config.TIME_WINDOW)) & (col('timestamp') < q_timestamp))\
+    #         .withColumn('common_buckets', udf_num_common_buckets('lsh_hash'))\
+    #         .filter( col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT)\
+    #         .withColumn( 'jaccard_sim', udf_get_jaccard_similarity('min_hash'))\
+    #         .filter( col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+    # #if config.LOG_DEBUG: filtered_df.count().map(lambda x: "{} similar news found".format(x))
+    # filtered_df.foreachPartition(lambda iter: save2redis(iter, news))
+    #
+    #
+    # """ Store tag + news in Redis """
+    # if config.LOG_DEBUG: print('========== Save news data to Redis =============')
+    # for tag in news['tag_company']:
+    #     # rdb.zadd("lsh:{}".format(tag), q.timestamp, json.dumps(news_data))
+    #     rdb.sadd("lsh:{}".format(tag), news['id'])
+    #     rdb.sadd("lsh_keys", "lsh:{}".format(tag))
+    # news_data = {
+    #                 "headline": news['headline'],
+    #                 "min_hash": ",".join([str(i) for i in q_mh]),
+    #                 "lsh_hash": ",".join([str(i) for i in q_lsh]),
+    #                 "timestamp": q_timestamp,
+    #                 "tag_company": ",".join(news["tag_company"])
+    #             }
+    # rdb.hmset("news:{}".format(news['id']), news_data)
 
 
 
