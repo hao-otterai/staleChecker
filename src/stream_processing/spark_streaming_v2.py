@@ -28,7 +28,6 @@ import min_hash
 import preprocess
 import batchCustomMinHashLSH as batch_process
 
-
 # schema for converting input news stream RDD[json] to DataFrame
 #input_schema = StructType([StructField(field, StringType(), nullable = True) for field in config.INPUT_SCHEMA_FIELDS])
 
@@ -53,7 +52,10 @@ def _ingest_timestamp(data):
 
 
 def process_news(news, mh, lsh):
-    if config.LOG_DEBUG: print('========= process_news: {} ======='.format(news['headline']))
+    if news is None or len(news) == 0:
+        return
+    if config.LOG_DEBUG:
+        print('========= process_news: {} ======='.format(news['headline']))
 
     q_timestamp = int(news['timestamp'])
     q_mh = mh.calc_min_hash_signature(news['text_body_stemmed'])
@@ -68,48 +70,54 @@ def process_news(news, mh, lsh):
     for tag in news['tag_company']:
         ids = ids.union(rdb.smembers("lsh:{}".format(tag)))
 
-    for id in ids:
-        # time windowing
-        temp_timestamp = rdb.hget("news:{}".format(id), 'timestamp')
-        if temp_timestamp is None: continue
-        temp_timestamp = int(temp_timestamp)
-        if temp_timestamp > q_timestamp or temp_timestamp < (q_timestamp-config.TIME_WINDOW): continue
+    if len(ids) > 0:
+        if config.LOG_DEBUG:
+            print('Comparing with {} previous news of same tag(s)'.format(len(ids)))
 
-        # LSH bucketing
-        temp_lsh  = rdb.hget("news:{}".format(id), 'lsh_hash')
-        if temp_lsh is  None: continue
-        temp_lsh = [int(i) for i in temp_lsh.split(',')]
-        if util.sim_count(q_lsh, temp_lsh) < config.LSH_SIMILARITY_BAND_COUNT: continue
+        for id in ids:
+            # time windowing
+            temp_timestamp = rdb.hget("news:{}".format(id), 'timestamp')
+            if temp_timestamp is None: continue
+            temp_timestamp = int(temp_timestamp)
+            if temp_timestamp > q_timestamp or temp_timestamp < (q_timestamp-config.TIME_WINDOW): continue
 
-        # Jaccard similarity calculation
-        temp_mh   = rdb.hget("news:{}".format(id), 'min_hash')
-        if temp_mh is None: continue
-        temp_mh = [int(i) for i in temp_mh.split(',')]
-        jaccard_sim = util.jaccard_sim_score(q_hm, temp_mh)
-        if jaccard_sim < config.DUP_QUESTION_MIN_HASH_THRESHOLD: continue
+            # LSH bucketing
+            temp_lsh  = rdb.hget("news:{}".format(id), 'lsh_hash')
+            if temp_lsh is  None: continue
+            temp_lsh = [int(i) for i in temp_lsh.split(',')]
+            if util.sim_count(q_lsh, temp_lsh) < config.LSH_SIMILARITY_BAND_COUNT: continue
 
-        dup_cands[id] = jaccard_sim
+            # Jaccard similarity calculation
+            temp_mh   = rdb.hget("news:{}".format(id), 'min_hash')
+            if temp_mh is None: continue
+            temp_mh = [int(i) for i in temp_mh.split(',')]
+            jaccard_sim = util.jaccard_sim_score(q_hm, temp_mh)
+            if jaccard_sim < config.DUP_QUESTION_MIN_HASH_THRESHOLD: continue
 
-    # save dup_cand to Redis
-    performance_metrics = {}
-    performance_metrics['ingest_timestamp'] = news['ingest_timestamp']
-    performance_metrics['consum_timestamp'] = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-    performance_metrics['num_comps'] = len(ids)
-    rdb.hmget('dup_cand_performance:{}'.format(news['id']), performance_metrics)
-    if len(dup_cands)>0:
-        rdb.hmset('dup_cand:{}'.format(news['id']), dup_cands)
+            dup_cands[id] = jaccard_sim
+
+        # save dup_cand to Redis
+        performance_metrics = {}
+        performance_metrics['ingest_timestamp'] = news['ingest_timestamp']
+        performance_metrics['consum_timestamp'] = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+        performance_metrics['num_comps'] = len(ids)
+        rdb.hmget('dup_cand_performance:{}'.format(news['id']), performance_metrics)
+        if len(dup_cands)>0:
+            rdb.hmset('dup_cand:{}'.format(news['id']), dup_cands)
 
     # save input news to Redis
     for tag in news['tag_company']:
         rdb.sadd("lsh:{}".format(tag), news['id'])
         rdb.sadd("lsh_keys", "lsh:{}".format(tag))
-    news_data = {   "headline": news['headline'],
+    rdb.hmset("news:{}".format(news['id']),
+                {
+                    "headline": news['headline'],
                     "min_hash": ",".join([str(i) for i in q_mh]),
                     "lsh_hash": ",".join([str(i) for i in q_lsh]),
                     "timestamp": q_timestamp,
                     "tag_company": ",".join(news["tag_company"])
                 }
-    rdb.hmset("news:{}".format(news['id']), news_data)
+            )
 
 
 def main():
@@ -140,7 +148,7 @@ def main():
 
     kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))\
                 .map(lambda data: _ingest_timestamp(data))\
-                .foreachRDD( lambda rdd: rdd.foreach(lambda data: process_news(data, mh, lsh)))
+                .foreachRDD( lambda rdd: rdd.foreachPartition(lambda data: process_news(data, mh, lsh)))
 
     ssc.start()
     ssc.awaitTermination()
