@@ -225,11 +225,14 @@ def main():
         return (data, datetime.now().strftime("%Y-%m-%d %I:%M:%S %p"))
 
     def _test(data):
-        print(json.loads(data[0]), data[1])
+        #print(json.loads(data[0]), data[1])
+        news = json.loads(data[0])
+        news['ingest_timestamp'] = data[1]
+        process_news(news)
 
     kafka_stream.map(lambda kafka_response: kafka_response[1])\
                 .map(lambda data: _ingest_timestamp2(data))\
-                .foreachRDD( lambda rdd: rdd.foreach(_test) )
+                .foreachRDD(lambda rdd: rdd.foreach(_test))
 
     ssc.start()
     ssc.awaitTermination()
