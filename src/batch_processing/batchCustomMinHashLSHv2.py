@@ -88,7 +88,7 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
             if rdb.hget('jacc_sim:{}'.format(_s_id), _b_id) is not None: continue
 
             # base is the news which appear later
-            (b_id, s_id) = (_s_id, _b_id) if if _base['timestamp'] < _sim['timestamp'] else (_b_id, _s_id)
+            (b_id, s_id) = (_s_id, _b_id) if _base['timestamp'] < _sim['timestamp'] else (_b_id, _s_id)
 
             #calculate jaccard similarity and update redis cache
             jacc_sim = util.jaccard_sim_score(_base['min_hash'].split(","), _sim['min_hash'].split(","))
