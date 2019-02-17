@@ -217,8 +217,8 @@ def main():
     #         lambda data: _ingest_timestamp(data)).foreachRDD(
     #         lambda rdd: _process_mini_batch(rdd))
 
-    kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
-            lambda data: _ingest_timestamp(data)).foreachRDD(
+    # .map(lambda data: _ingest_timestamp(data))
+    kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).foreachRDD(
             lambda rdd: rdd.foreach(process_news))
 
     ssc.start()
