@@ -221,8 +221,15 @@ def main():
     #         lambda data: _ingest_timestamp(data)).foreachRDD(
     #         lambda rdd: rdd.foreach(process_news))
 
-    kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))\
-                .map(lambda data: _ingest_timestamp(data)).pprint()
+    def _ingest_timestamp2(data):
+        return (data, datetime.now().strftime("%Y-%m-%d %I:%M:%S %p"))
+
+    def _test(data):
+        print(json.loads(data[0]), data[1])
+
+    kafka_stream.map(lambda kafka_response: kafka_response[1])\
+                .map(lambda data: _ingest_timestamp2(data))\
+                .foreachRDD( lambda rdd: rdd.foreach(_test) )
 
     ssc.start()
     ssc.awaitTermination()
