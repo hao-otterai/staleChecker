@@ -52,18 +52,21 @@ def save2redis(iter, news):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     token = "dup_cand:{}".format(news['id'])
     for entry in iter:
-        processed_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-        dup = (news['headline'], news['timestamp'], entry.id, entry.headline, entry.timestamp,
-                    news['ingest_timestamp'], processed_timestamp)
+        #processed_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+        dup = (news['headline'], news['timestamp'], entry.id, entry.headline, entry.timestamp)
+                    #news['ingest_timestamp'], processed_timestamp)
         if config.LOG_DEBUG: print("saving dup_cand to Redis: {}".format(dup))
         rdb.zadd(token, entry.jaccard_sim, dup)
 
 
 
-def process_news(news):
+def process_news(data):
+    print('========= process_news  ========')
+    news = json.loads(data[0])
+
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     if config.LOG_DEBUG:
-        print('========= process_news: {} ======='.format(news['headline']))
+        print('========= headline: {} ======='.format(news['headline']))
 
     q_timestamp = int(news['timestamp'])
     q_mh = mh.calc_min_hash_signature(news['text_body_stemmed'])
@@ -188,7 +191,6 @@ def main():
     ssc = StreamingContext(sc, config.SPARK_STREAMING_MINI_BATCH_WINDOW)
     #ssc.checkpoint("_spark_streaming_checkpoint")
 
-
     kafka_stream = KafkaUtils.createDirectStream( ssc,
                     [config.KAFKA_TOPIC],
                     {"metadata.broker.list": ",".join(config.KAFKA_SERVERS)} )
@@ -226,9 +228,7 @@ def main():
 
     def _test(data):
         #print(json.loads(data[0]), data[1])
-        news = json.loads(data[0])
-        news['ingest_timestamp'] = data[1]
-        process_news(news)
+        process_news(data)
 
     kafka_stream.map(lambda kafka_response: kafka_response[1])\
                 .map(lambda data: _ingest_timestamp2(data))\
