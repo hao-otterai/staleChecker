@@ -58,8 +58,9 @@ def save2redis(iter, news):
 
 
 def process_news(news, mh, lsh):
+    print('========= process_news  ========')
+    # news = json.loads(data[0])
     if config.LOG_DEBUG:
-        print('========= process_news  ========')
         print('========= headline: {} ======='.format(news['headline']))
 
     q_timestamp = int(news['timestamp'])
@@ -212,26 +213,23 @@ def main():
             if len(news) > 0:
                 process_news(news)
 
-    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
-    #         lambda data: _ingest_timestamp(data)).foreachRDD(
-    #         lambda rdd: _process_mini_batch(rdd))
-
-    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
-    #         lambda data: _ingest_timestamp(data)).foreachRDD(
-    #         lambda rdd: rdd.foreach(process_news))
-
     def _ingest_timestamp2(data):
         return (data, datetime.now().strftime("%Y-%m-%d %I:%M:%S %p"))
 
     def _helper(data):
-        #print(json.loads(data[0]), data[1])
-        news = json.loads(data[0])
-        news['ingest_timestamp'] = data[1]
         process_news(data, mh, lsh)
 
-    kafka_stream.map(lambda kafka_response: kafka_response[1])\
-                .map(lambda data: _ingest_timestamp2(data))\
-                .foreachRDD(lambda rdd: rdd.foreach(_helper))
+    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
+    #         lambda data: _ingest_timestamp(data)).foreachRDD(
+    #         lambda rdd: _process_mini_batch(rdd))
+
+    kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
+            lambda data: _ingest_timestamp(data)).foreachRDD(
+            lambda rdd: rdd.foreach(_helper))
+
+    # kafka_stream.map(lambda kafka_response: kafka_response[1])\
+    #             .map(lambda data: _ingest_timestamp2(data))\
+    #             .foreachRDD(lambda rdd: rdd.foreach(_helper))
 
     ssc.start()
     ssc.awaitTermination()
