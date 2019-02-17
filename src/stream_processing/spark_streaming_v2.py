@@ -90,7 +90,7 @@ def process_news(news, mh, lsh):
             temp_mh   = rdb.hget("news:{}".format(id), 'min_hash')
             if temp_mh is None: continue
             temp_mh = [int(i) for i in temp_mh.split(',')]
-            jaccard_sim = util.jaccard_sim_score(q_hm, temp_mh)
+            jaccard_sim = util.jaccard_sim_score(q_mh, temp_mh)
             if jaccard_sim < config.DUP_QUESTION_MIN_HASH_THRESHOLD: continue
 
             dup_cands[id] = jaccard_sim
