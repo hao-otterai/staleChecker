@@ -76,19 +76,21 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
         _base = rdb.hgetall('news:{}'.format(_b_id))
 
         # skip those whose jacc_sim already calculated
-        _s_ids = [i for i in candidate_set[idx+1:] if i not in rdb.hgetall('jacc_sim:{}'.format(_b_id))]
+        _s_ids = [iid for iid in candidate_set[idx+1:] if iid not in rdb.hgetall('jacc_sim:{}'.format(_b_id))]
 
         for _s_id in _s_ids:
             _sim  = rdb.hgetall('news:{}'.format(_s_id))
 
             # skip if timestamp difference is larger than time window
-            if abs(_base['timestamp'] - _sim['timestamp']) > config.TIME_WINDOW: continue
+            if abs(int(_base['timestamp']) - int(_sim['timestamp'])) > config.TIME_WINDOW:
+                continue
 
             # skip if _b_id is in for jacc_sim:_s_id
-            if rdb.hget('jacc_sim:{}'.format(_s_id), _b_id) is not None: continue
+            if rdb.hget('jacc_sim:{}'.format(_s_id), _b_id) is not None:
+                continue
 
             # base is the news which appear later
-            (b_id, s_id) = (_s_id, _b_id) if _base['timestamp'] < _sim['timestamp'] else (_b_id, _s_id)
+            (b_id, s_id) = (_s_id, _b_id) if int(_base['timestamp']) < int(_sim['timestamp']) else (_b_id, _s_id)
 
             #calculate jaccard similarity and update redis cache
             jacc_sim = util.jaccard_sim_score(_base['min_hash'].split(","), _sim['min_hash'].split(","))

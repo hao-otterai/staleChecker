@@ -100,7 +100,7 @@ def process_news(news, mh, lsh):
         performance_metrics['ingest_timestamp'] = news['ingest_timestamp']
         performance_metrics['consum_timestamp'] = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
         performance_metrics['num_comps'] = len(ids)
-        rdb.hmget('dup_cand_performance:{}'.format(news['id']), performance_metrics)
+        rdb.hmset('dup_cand_performance:{}'.format(news['id']), performance_metrics)
         if len(dup_cands)>0:
             rdb.hmset('dup_cand:{}'.format(news['id']), dup_cands)
 
