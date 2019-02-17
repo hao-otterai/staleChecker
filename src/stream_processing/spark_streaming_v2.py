@@ -52,8 +52,7 @@ def _ingest_timestamp(data):
 
 
 def process_news(news, mh, lsh):
-    if news is None or len(news) == 0:
-        return
+    if news is None: return
     if config.LOG_DEBUG:
         print('========= process_news: {} ======='.format(news['headline']))
 
@@ -146,9 +145,14 @@ def main():
 
     kafka_stream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
 
+    def _helper(iterator, mh, lsh):
+        for news in iterator:
+            if len(news)>0:
+                process_news(news, mh, lsh )
+
     kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))\
                 .map(lambda data: _ingest_timestamp(data))\
-                .foreachRDD( lambda rdd: rdd.foreachPartition(lambda data: process_news(data, mh, lsh)))
+                .foreachRDD( lambda rdd: rdd.foreachPartition(lambda iterator: _helper(iterator, mh, lsh)))
 
     ssc.start()
     ssc.awaitTermination()
