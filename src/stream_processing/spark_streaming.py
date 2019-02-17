@@ -59,7 +59,6 @@ def save2redis(iter, news):
 
 def process_news(news, mh, lsh):
     print('========= process_news  ========')
-    # news = json.loads(data[0])
     if config.LOG_DEBUG:
         print('========= headline: {} ======='.format(news['headline']))
 
@@ -225,7 +224,7 @@ def main():
 
     kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
             lambda data: _ingest_timestamp(data)).foreachRDD(
-            lambda rdd: rdd.foreach(_helper))
+            lambda rdd: rdd.foreach(lambda data: process_news(data, mh, lsh)))
 
     # kafka_stream.map(lambda kafka_response: kafka_response[1])\
     #             .map(lambda data: _ingest_timestamp2(data))\
