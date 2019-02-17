@@ -96,13 +96,16 @@ def process_news(news, mh, lsh):
             dup_cands[id] = jaccard_sim
 
         # save dup_cand to Redis
-        performance_metrics = {}
-        performance_metrics['ingest_timestamp'] = news['ingest_timestamp']
-        performance_metrics['consum_timestamp'] = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-        performance_metrics['num_comps'] = len(ids)
-        rdb.hmset('dup_cand_performance:{}'.format(news['id']), performance_metrics)
-        if len(dup_cands)>0:
-            rdb.hmset('dup_cand:{}'.format(news['id']), dup_cands)
+        if len(dup_cands)>0: rdb.hmset('dup_cand:{}'.format(news['id']), dup_cands)
+
+        # log streaming performance metrics to Redis
+        _metrics = {}
+        _metrics['id'] = news['id']
+        _metrics['ingest_timestamp'] = news['ingest_timestamp']
+        _metrics['consum_timestamp'] = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+        _metrics['num_comps'] = len(ids)
+        _metrics['num_dups'] = len(dup_cands)
+        rdb.sadd('metrics', json.dumps(_metrics))
 
     # save input news to Redis
     for tag in news['tag_company']:
