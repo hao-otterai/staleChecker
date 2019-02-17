@@ -83,13 +83,34 @@ def count_me(input_str):
     return '<br>'.join(response)
 
 
-@app.route("/allnews")
-def allNews():
+@app.route("/latest")
+def getLatestNews():
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980000000, withscores=True)
-    #dup_cands = [rdb.zrevrangebyscore("dup_cand:{}".format(id[0]), 1.0, DUP_QUESTION_SHOW_THRESHOLD, withscores=True) for id in ids]
-    #dup_cands = [format_dup_cand(dc) for id in ids]
-    return render_template("q_list.html", dup_cands=dup_cands)
+    output = {}
+    for id in ids[:100]:
+        output[id] = {}
+        news = rdb.hgetall("news:{}".format(id))
+        try:
+            output['headline'] = news['headline']
+        except Exception as e:
+            pass
+        try:
+            output['body'] = news['body']
+        except Exception as e:
+            pass
+        try:
+            output['tag_company'] = news['tag_company']
+        except Exception as e:
+            pass
+
+        output['numDups'] = rdb.hlen("dup_cand:{}".format(id))
+        if output['numDups'] > 0:
+            output['dupCands'] = rdb.hgetall("dup_cand:{}".format(id))
+        else:
+            output['dupCands'] = {}
+
+    return render_template("news_list.html", dup_cands=output)
 
 
 @app.route('/dup/<news_id>')
