@@ -57,10 +57,9 @@ def save2redis(iter, news):
 
 
 
-def process_news(data, mh, lsh):
-    print('========= process_news  ========')
-    news = json.loads(data[0])
+def process_news(news, mh, lsh):
     if config.LOG_DEBUG:
+        print('========= process_news  ========')
         print('========= headline: {} ======='.format(news['headline']))
 
     q_timestamp = int(news['timestamp'])
@@ -224,13 +223,15 @@ def main():
     def _ingest_timestamp2(data):
         return (data, datetime.now().strftime("%Y-%m-%d %I:%M:%S %p"))
 
-    def _test(data):
+    def _helper(data):
         #print(json.loads(data[0]), data[1])
+        news = json.loads(data[0])
+        news['ingest_timestamp'] = data[1]
         process_news(data, mh, lsh)
 
     kafka_stream.map(lambda kafka_response: kafka_response[1])\
                 .map(lambda data: _ingest_timestamp2(data))\
-                .foreachRDD(lambda rdd: rdd.foreach(_test))
+                .foreachRDD(lambda rdd: rdd.foreach(_helper))
 
     ssc.start()
     ssc.awaitTermination()
