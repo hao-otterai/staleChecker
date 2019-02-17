@@ -251,7 +251,9 @@ def main():
     compute_minhash_lsh(df, mh, lsh) # Compute MinHash/LSH hashes for historical news
 
     # Compute pairwise LSH similarities for news within tags
-    if (config.LOG_DEBUG): print("[BATCH]: Fetching questions,comparing LSH and MinHash, uploading duplicate candidates back to Redis...")
+    if (config.LOG_DEBUG):
+        print("[BATCH]: Fetching questions,comparing LSH and MinHash, \
+                uploading duplicate candidates back to Redis...")
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
     # Fetch all tags from lsh_keys set

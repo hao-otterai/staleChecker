@@ -86,31 +86,31 @@ def process_news(news, mh, lsh):
         print("{0} historical news in the tag(s): {1}".format(len(tq), news['tag_company']))
         df.pprint()
 
-    # udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
-    # udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
-    # filtered_df = df.filter((col('timestamp') > (q_timestamp-config.TIME_WINDOW)) & (col('timestamp') < q_timestamp))\
-    #         .withColumn('common_buckets', udf_num_common_buckets('lsh_hash'))\
-    #         .filter( col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT)\
-    #         .withColumn( 'jaccard_sim', udf_get_jaccard_similarity('min_hash'))\
-    #         .filter( col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
-    # #if config.LOG_DEBUG: filtered_df.count().map(lambda x: "{} similar news found".format(x))
-    # filtered_df.foreachPartition(lambda iter: save2redis(iter, news))
-    #
-    #
-    # """ Store tag + news in Redis """
-    # if config.LOG_DEBUG: print('========== Save news data to Redis =============')
-    # for tag in news['tag_company']:
-    #     # rdb.zadd("lsh:{}".format(tag), q.timestamp, json.dumps(news_data))
-    #     rdb.sadd("lsh:{}".format(tag), news['id'])
-    #     rdb.sadd("lsh_keys", "lsh:{}".format(tag))
-    # news_data = {
-    #                 "headline": news['headline'],
-    #                 "min_hash": ",".join([str(i) for i in q_mh]),
-    #                 "lsh_hash": ",".join([str(i) for i in q_lsh]),
-    #                 "timestamp": q_timestamp,
-    #                 "tag_company": ",".join(news["tag_company"])
-    #             }
-    # rdb.hmset("news:{}".format(news['id']), news_data)
+    udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
+    udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
+    filtered_df = df.filter((col('timestamp') > (q_timestamp-config.TIME_WINDOW)) & (col('timestamp') < q_timestamp))\
+            .withColumn('common_buckets', udf_num_common_buckets('lsh_hash'))\
+            .filter( col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT)\
+            .withColumn( 'jaccard_sim', udf_get_jaccard_similarity('min_hash'))\
+            .filter( col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+    #if config.LOG_DEBUG: filtered_df.count().map(lambda x: "{} similar news found".format(x))
+    filtered_df.foreachPartition(lambda iter: save2redis(iter, news))
+
+
+    """ Store tag + news in Redis """
+    if config.LOG_DEBUG: print('========== Save news data to Redis =============')
+    for tag in news['tag_company']:
+        # rdb.zadd("lsh:{}".format(tag), q.timestamp, json.dumps(news_data))
+        rdb.sadd("lsh:{}".format(tag), news['id'])
+        rdb.sadd("lsh_keys", "lsh:{}".format(tag))
+    news_data = {
+                    "headline": news['headline'],
+                    "min_hash": ",".join([str(i) for i in q_mh]),
+                    "lsh_hash": ",".join([str(i) for i in q_lsh]),
+                    "timestamp": q_timestamp,
+                    "tag_company": ",".join(news["tag_company"])
+                }
+    rdb.hmset("news:{}".format(news['id']), news_data)
 
 
 
