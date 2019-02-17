@@ -62,27 +62,30 @@ def process_news(news, mh, lsh):
     """
     get the dataframe for all news of given tag. id and lsh_hash columns loaded from Redis.
     """
-    # rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-    # tq = []
-    # for tag in news['tag_company']:
-    #     #tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
-    #     for id in rdb.smembers("lsh:{}".format(tag)):
-    #         temp_lsh       = rdb.hget("news:{}".format(id), 'lsh_hash')
-    #         temp_mh        = rdb.hget("news:{}".format(id), 'min_hash')
-    #         temp_timestamp = rdb.hget("news:{}".format(id), 'timestamp')
-    #         if temp_lsh is not None and temp_mh is not None:
-    #             temp = {}
-    #             temp['id'] = id
-    #             temp['lsh_hash'] = [int(i) for i in temp_lsh.split(',')]
-    #             temp['min_hash'] = [int(i) for i in temp_mh.split(',')]
-    #             temp['timestamp'] = int(temp_timestamp)
-    #             tq.append(temp)
-    #         else:
-    #             print("Failed to get lsh_hash for news:{}".format(id))
-    # if len(tq) < 1: return
-    # if config.LOG_DEBUG: print("{0} historical news in the tag(s): {1}".format(len(tq), news['tag_company']))
-    # df = sql_context.read.json(sc.parallelize(tq))
-    #
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    tq = []
+    for tag in news['tag_company']:
+        #tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
+        for id in rdb.smembers("lsh:{}".format(tag)):
+            temp_lsh       = rdb.hget("news:{}".format(id), 'lsh_hash')
+            temp_mh        = rdb.hget("news:{}".format(id), 'min_hash')
+            temp_timestamp = rdb.hget("news:{}".format(id), 'timestamp')
+            if temp_lsh is not None and temp_mh is not None:
+                temp = {}
+                temp['id'] = id
+                temp['lsh_hash'] = [int(i) for i in temp_lsh.split(',')]
+                temp['min_hash'] = [int(i) for i in temp_mh.split(',')]
+                temp['timestamp'] = int(temp_timestamp)
+                tq.append(temp)
+            else:
+                print("Failed to get lsh_hash for news:{}".format(id))
+    if len(tq) < 1: return
+    df = sql_context.read.json(sc.parallelize(tq))
+
+    if config.LOG_DEBUG:
+        print("{0} historical news in the tag(s): {1}".format(len(tq), news['tag_company']))
+        df.pprint()
+
     # udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
     # udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
     # filtered_df = df.filter((col('timestamp') > (q_timestamp-config.TIME_WINDOW)) & (col('timestamp') < q_timestamp))\
