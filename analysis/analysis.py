@@ -4,7 +4,7 @@ import operator
 import pickle
 import os
 import matplotlib.pyplot as plotter
-
+from tqdm import tqdm
 
 REDIS_SERVER = "ec2-54-189-255-59.us-west-2.compute.amazonaws.com"
 
@@ -15,7 +15,7 @@ def sortNewsIdRedis():
     # rdb.hmset("news:{}".format(news.id), save_content)
     ids = rdb.smembers("newsId")
     print('number of news ids in newsID: {}'.format(rdb.scard("newsId")))
-    for id in ids:
+    for id in tqdm(ids):
         timestamp = rdb.hget("news:{}".format(id), 'timestamp')
         if timestamp is not None:
             rdb.zadd("newsIdOrderedByTimestamp", int(timestamp), id)
