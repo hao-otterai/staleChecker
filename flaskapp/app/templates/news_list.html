@@ -18,7 +18,7 @@
             <td> <a class="news_link" href="/news/{{news['id']}}">{{ news["headline"] }}</a></td>
             <td> {{ news["numDups"] }} </td>
             <td>
-              {% for tag in news["tag_company"] %}
+              {% for tag in news["tag_company"][0:5] %}
                 <a class="tag_link" href="/tag/{{tag}}">{{ tag }} </a>
               {% endfor %}
             </td>
