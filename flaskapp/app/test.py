@@ -59,19 +59,19 @@ def getNewsDetails(news_id):
     try:
         res['headline'] = news['headline']
     except Exception as e:
-        continue
+        res['headline'] = ''
     try:
         res['body'] = news['body']
     except Exception as e:
-        pass
+        res['body'] = ''
     try:
         res['tag_company'] = news['tag_company'].split(',')
     except Exception as e:
-        pass
+        res['tag_company'] = []
     try:
         res['timestamp'] = convertUnixtimestamp(news['timestamp'])
     except Exception as e:
-        pass
+        res['timestamp'] = ''
     res['numDups'] = rdb.hlen("dup_cand:{}".format(news_id))
 
     if res['numDups'] > 0:
