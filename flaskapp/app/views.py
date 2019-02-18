@@ -66,55 +66,59 @@ def format_dup_cand(dc):
 
 
 ''' Routes '''
-@app.route('/')
-@app.route('/latest')
-def latestNews():
-    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
-    ids = rdb.zrevrangebyscore("newsId", "+inf", 980380000, withscores=False)
-    output = []
-    for id in ids[:500]:
-        temp = {}
-        news = rdb.hgetall("news:{}".format(id))
+# @app.route('/')
+# @app.route('/latest')
+# def latestNews():
+#     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
+#     ids = rdb.zrevrangebyscore("newsId", "+inf", 980380000, withscores=False)
+#     output = []
+#     for id in ids[:500]:
+#         temp = {}
+#         news = rdb.hgetall("news:{}".format(id))
+#
+#         if news is None: continue
+#
+#         temp['id'] = id
+#         try:
+#             temp['headline'] = news['headline']
+#         except Exception as e:
+#             continue
+#         try:
+#             temp['body'] = news['body']
+#         except Exception as e:
+#             pass
+#         try:
+#             temp['tag_company'] = news['tag_company'].split(',')
+#         except Exception as e:
+#             pass
+#         try:
+#             temp['timestamp'] = convertUnixtimestamp(news['timestamp'])
+#         except Exception as e:
+#             pass
+#         temp['numDups'] = rdb.hlen("dup_cand:{}".format(id))
+#         if temp['numDups'] > 0:
+#             temp['dupCands'] = rdb.hgetall("dup_cand:{}".format(id))
+#         else:
+#             temp['dupCands'] = []
+#         output.append(temp)
+#     return render_template("news_list.html", dup_cands=output)
+#
+#
+# @app.route('/news/<news_id>')
+# def newsView(news_id):
+#     output = getNewsDetails(news_id)
+#     if output['numDups'] > 0:
+#         ids = rdb.hgetall("dup_cand:{}".format(news_id))
+#         for id in ids:
+#             dup = getNewsDetails(id)
+#             output['dupCands'].append(dup)
+#
+#     return render_template("news_detail.html", news=output)
 
-        if news is None: continue
 
-        temp['id'] = id
-        try:
-            temp['headline'] = news['headline']
-        except Exception as e:
-            continue
-        try:
-            temp['body'] = news['body']
-        except Exception as e:
-            pass
-        try:
-            temp['tag_company'] = news['tag_company'].split(',')
-        except Exception as e:
-            pass
-        try:
-            temp['timestamp'] = convertUnixtimestamp(news['timestamp'])
-        except Exception as e:
-            pass
-        temp['numDups'] = rdb.hlen("dup_cand:{}".format(id))
-        if temp['numDups'] > 0:
-            temp['dupCands'] = rdb.hgetall("dup_cand:{}".format(id))
-        else:
-            temp['dupCands'] = []
-        output.append(temp)
-    return render_template("news_list.html", dup_cands=output)
-
-
-@app.route('/news/<news_id>')
-def newsView(news_id):
-    output = getNewsDetails(news_id)
-    if output['numDups'] > 0:
-        ids = rdb.hgetall("dup_cand:{}".format(news_id))
-        for id in ids:
-            dup = getNewsDetails(id)
-            output['dupCands'].append(dup)
-
-    return render_template("news_detail.html", news=output)
-
+@app.route('/test')
+def index():
+    return "Hello from flask!"
 
 @app.route('/slides')
 def slides():
@@ -124,9 +128,6 @@ def slides():
 def github():
     return redirect("https://github.com/haoyang09/staleChecker.git")
 
-@app.route('/test')
-def index():
-    return "Hello from flask!"
 
 @app.route('/countme/<input_str>')
 def count_me(input_str):
