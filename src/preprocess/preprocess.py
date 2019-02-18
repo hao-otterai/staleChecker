@@ -62,7 +62,7 @@ def store_preprocessed_redis(iterator):
                         "tag_company": ",".join(news.tag_company)}
         if config.LOG_DEBUG:
             print(save_content['headline'])
-        rdb.sadd("newsId", news.id)
+        rdb.zadd("newsId", int(news.timestamp), news.id)
         rdb.hmset("news:{}".format(news.id), save_content)
 
 

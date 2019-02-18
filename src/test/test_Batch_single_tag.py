@@ -3,7 +3,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/batch_process")
 
-import batchCustomMinHashLSHv2 as batch
+import batchCustomMinHashLSH as batch
 
 
 def main():
