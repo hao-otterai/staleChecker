@@ -54,7 +54,7 @@ def format_dup_cand(dc):
 
 ''' Routes '''
 @app.route('/')
-@app.route('/index')
+@app.route('/latest')
 def getLatestNews():
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980000000, withscores=False)
@@ -62,20 +62,23 @@ def getLatestNews():
     for id in ids[:1000]:
         temp = {}
         news = rdb.hgetall("news:{}".format(id))
-        if news is None:
-            continue
+        if news is None: continue
+
         try:
             temp['headline'] = news['headline']
         except Exception as e:
             continue
+
         try:
             temp['body'] = news['body']
         except Exception as e:
             pass
+
         try:
-            temp['tag_company'] = news['tag_company']
+            temp['tag_company'] = ", ".join(news['tag_company'])
         except Exception as e:
             pass
+
         try:
             temp['timestamp'] = convertUnixtimestamp(news['timestamp'])
         except Exception as e:
@@ -86,9 +89,7 @@ def getLatestNews():
             temp['dupCands'] = rdb.hgetall("dup_cand:{}".format(id))
         else:
             temp['dupCands'] = {}
-
         output.append(temp)
-
     return render_template("news_list.html", latest=output)
 
 
@@ -119,11 +120,9 @@ def slides():
 def github():
     return redirect("https://github.com/haoyang09/staleChecker.git")
 
-
 @app.route('/test')
 def index():
     return "Hello from flask!"
-
 
 @app.route('/countme/<input_str>')
 def count_me(input_str):
@@ -133,18 +132,14 @@ def count_me(input_str):
         response.append('"{}": {}'.format(letter, count))
     return '<br>'.join(response)
 
+@app.route("/about")
+def about():
+    return render_template("about.html")
 
+@app.route("/metrics")
+def metrics():
+    return render_template("metrics.html")
 
-# @app.route("/about")
-# def about():
-#     return render_template("about.html")
-#
-#
 # @app.route("/visualization")
 # def visualization():
 #     return render_template("q_cluster_visualization.html")
-#
-#
-# @app.route("/metrics")
-# def metrics():
-#     return render_template("metrics.html")
