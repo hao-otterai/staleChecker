@@ -108,7 +108,10 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
             # lsh_hash bucketing
             _sim['lsh_hash'] = rdb.hget('news:{}'.format(_s_id), 'lsh_hash')
             _sim['lsh_hash'] = _sim['lsh_hash'].split(",")
-            if util.sim_count(_base['lsh_hash'], _sim['lsh_hash']) < config.LSH_SIMILARITY_BAND_COUNT:
+            band_counts = util.sim_count(_base['lsh_hash'], _sim['lsh_hash'])
+            if config.LOG_DEBUG:
+                print('Common Band Count: {} , {}--{}'.format(band_counts, _b_id, _s_id))
+            if band_counts < config.LSH_SIMILARITY_BAND_COUNT:
                 continue
 
             #calculate jaccard similarity and update redis cache
@@ -121,7 +124,7 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
             if jacc_sim > config.DUP_QUESTION_MIN_HASH_THRESHOLD:
                 rdb.hset("dup_cand:{}".format(b_id), s_id, jacc_sim)
                 if config.LOG_DEBUG:
-                    print('Dup candidate {}, {}---{}'.format(jacc_sim, _base['headline'], _sim['headline']))
+                    print('Dup candidate {}, {}---{}'.format(jacc_sim,  _b_id, _s_id))
 
 
 
