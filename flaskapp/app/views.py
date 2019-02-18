@@ -58,34 +58,36 @@ def format_dup_cand(dc):
 def getLatestNews():
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980000000, withscores=False)
-    output = {}
+    output = []
     for id in ids[:1000]:
-        output[id] = {}
+        temp = {}
         news = rdb.hgetall("news:{}".format(id))
         if news is None:
             continue
         try:
-            output['headline'] = news['headline']
+            temp['headline'] = news['headline']
         except Exception as e:
             continue
         try:
-            output['body'] = news['body']
+            temp['body'] = news['body']
         except Exception as e:
             pass
         try:
-            output['tag_company'] = news['tag_company']
+            temp['tag_company'] = news['tag_company']
         except Exception as e:
             pass
         try:
-            output['timestamp'] = convertUnixtimestamp(news['timestamp'])
+            temp['timestamp'] = convertUnixtimestamp(news['timestamp'])
         except Exception as e:
             pass
 
-        output['numDups'] = rdb.hlen("dup_cand:{}".format(id))
-        if output['numDups'] > 0:
-            output['dupCands'] = rdb.hgetall("dup_cand:{}".format(id))
+        temp['numDups'] = rdb.hlen("dup_cand:{}".format(id))
+        if temp['numDups'] > 0:
+            temp['dupCands'] = rdb.hgetall("dup_cand:{}".format(id))
         else:
-            output['dupCands'] = {}
+            temp['dupCands'] = {}
+
+        output.append(temp)
 
     return render_template("news_list.html", latest=output)
 
