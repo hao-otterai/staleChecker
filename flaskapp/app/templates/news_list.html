@@ -6,13 +6,13 @@
       <thead>
         <tr>
           <th>Timestamp</th>
-          <th>Latest News</th>
+          <th>News Headline</th>
           <th>No. Similar News</th>
           <th>Tags</th>
         </tr>
       </thead>
       <tbody>
-        {% for news in latestNews %}
+        {% for news in dup_cands %}
           <tr>
             <td> {{ news["timestamp"] }} </td>
             <td> {{ news["headline"] }}</td>

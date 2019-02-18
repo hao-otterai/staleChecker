@@ -57,33 +57,29 @@ def format_dup_cand(dc):
 @app.route('/latest')
 def getLatestNews():
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
-    ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980000000, withscores=False)
+    ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980380000, withscores=False)
     output = []
     for id in ids[:500]:
         temp = {}
         news = rdb.hgetall("news:{}".format(id))
+        
         if news is None: continue
-
         try:
             temp['headline'] = news['headline']
         except Exception as e:
             continue
-
         try:
             temp['body'] = news['body']
         except Exception as e:
             pass
-
         try:
             temp['tag_company'] = ", ".join(news['tag_company'])
         except Exception as e:
             pass
-
         try:
             temp['timestamp'] = convertUnixtimestamp(news['timestamp'])
         except Exception as e:
             pass
-
         temp['numDups'] = rdb.hlen("dup_cand:{}".format(id))
         if temp['numDups'] > 0:
             temp['dupCands'] = rdb.hgetall("dup_cand:{}".format(id))
