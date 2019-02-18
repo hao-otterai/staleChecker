@@ -3,7 +3,6 @@ from flask import render_template, redirect
 from datetime import datetime
 import redis
 import math
-from collections import Counter
 
 import sys
 import os
@@ -39,7 +38,7 @@ def getNewsDetails(news_id):
         "tag_company": news['tag_company'],
         "timestamp": convertUnixtimestamp(news['timestamp']),
         'numDups' = rdb.hlen("dup_cand:{}".format(news_id)),
-        'dupCands' = [],
+        'dupCands' = []
     }
     return output
 
@@ -116,9 +115,6 @@ def format_dup_cand(dc):
 #     return render_template("news_detail.html", news=output)
 
 
-@app.route('/test')
-def index():
-    return "Hello from flask!"
 
 @app.route('/slides')
 def slides():
@@ -127,15 +123,6 @@ def slides():
 @app.route('/github')
 def github():
     return redirect("https://github.com/haoyang09/staleChecker.git")
-
-
-@app.route('/countme/<input_str>')
-def count_me(input_str):
-    input_counter = Counter(input_str)
-    response = []
-    for letter, count in input_counter.most_common():
-        response.append('"{}": {}'.format(letter, count))
-    return '<br>'.join(response)
 
 @app.route("/about")
 def about():
