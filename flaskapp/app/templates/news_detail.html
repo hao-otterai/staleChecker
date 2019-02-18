@@ -16,35 +16,36 @@
    </p>
  </div>
 
- <h3 Similar news in the past</h3>
-
- <div class="table-responsive">
-   <table class="table table-striped">
-     <thead>
-       <tr>
-         <th>Similarity Score</th>
-         <th>Timestamp</th>
-         <th>News Headline</th>
-         <th>No. Similar News</th>
-         <th>Tags</th>
-       </tr>
-     </thead>
-     <tbody>
-       {% for dup in news['dupCandDetails'] %}
+ <div>
+   <h5 Similar news in the past</h5>
+   <div class="table-responsive">
+     <table class="table table-striped">
+       <thead>
          <tr>
-           <td> --- </td>
-           <td> {{ dup["timestamp"] }} </td>
-           <td> <a class="news_link" href="/news/{{dup['id']}}">{{ dup["headline"] }}</a></td>
-           <td> {{ dup["numDups"] }} </td>
-           <td>
-             {% for tag in dup["tag_company"] %}
-               <a class="tag_link" href="/tag/{{tag}}">{{ tag }} </a>
-             {% endfor %}
-           </td>
+           <th>Similarity Score</th>
+           <th>Timestamp</th>
+           <th>News Headline</th>
+           <!-- <th>No. Similar News</th> -->
+           <th>Tags</th>
          </tr>
-       {% endfor %}
-     </tbody>
-   </table>
+       </thead>
+       <tbody>
+         {% for dup in news['dupCandDetails'] %}
+           <tr>
+             <td> {{ dup["sim_score"]}} </td>
+             <td> {{ dup["timestamp"] }} </td>
+             <td> <a class="news_link" href="/news/{{dup['id']}}">{{ dup["headline"] }}</a></td>
+             <!-- <td> {{ dup["numDups"] }} </td> -->
+             <td>
+               {% for tag in dup["tag_company"] %}
+                 <a class="tag_link" href="/tag/{{tag}}">{{ tag }} </a>
+               {% endfor %}
+             </td>
+           </tr>
+         {% endfor %}
+       </tbody>
+     </table>
+   </div>
  </div>
 
 <script type="text/javascript">
