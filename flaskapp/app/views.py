@@ -5,7 +5,7 @@ from collections import Counter
 from datetime import datetime
 import redis
 import math
-
+from decimal import Decimal
 import sys
 import os
 
@@ -102,7 +102,7 @@ def singleNewsView(news_id):
     for id in news['dupCands']:
         dup = getNewsDetails(id)
         # similarity score here
-        dup['sim_score'] = news['dupCands'][id]
+        dup['sim_score'] = round(Decimal(news['dupCands'][id]), 2)
         news['dupCandDetails'].append(dup)
 
     return render_template("news_detail.html", news=news)
