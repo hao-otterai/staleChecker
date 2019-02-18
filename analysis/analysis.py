@@ -8,6 +8,20 @@ import matplotlib.pyplot as plotter
 
 REDIS_SERVER = "ec2-54-189-255-59.us-west-2.compute.amazonaws.com"
 
+
+def sortNewsIdRedis():
+    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
+    # rdb.sadd("newsId", news.id)
+    # rdb.hmset("news:{}".format(news.id), save_content)
+    ids = rdb.smembers("newsId")
+    print('number of news ids in newsID: {}'.format(rdb.scard("newsId")))
+    for id in ids:
+        timestamp = rdb.hget("news:{}".format(id), 'timestamp')
+        if timestamp is not None:
+            rdb.zadd("newsIdOrderedByTimestamp", timestamp, id)
+    print('number of news ids in newsIdOrderedByTimestamp: {}'.format(rdb.zcard("newsIdOrderedByTimestamp")))
+
+
 # def data_stats():
 #     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
 #     idsAll = rdb.smembers('newsId')
