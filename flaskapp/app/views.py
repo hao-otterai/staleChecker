@@ -85,7 +85,7 @@ def count_me(input_str):
 
 @app.route("/latest")
 def getLatestNews():
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980000000, withscores=True)
     output = {}
     for id in ids[:1000]:
@@ -121,13 +121,13 @@ def getLatestNews():
 
 @app.route('/dup/<news_id>')
 def getDupCands(news_id):
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     dups = "dup_cand:{}".format(id)
 
 
 @app.route('/news/<news_id>')
 def newsView(news_id):
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     news = redis.hgetall("news:{}".format(news_id))
 
 
