@@ -1,136 +1,187 @@
-
 import os
 import sys
 import redis
 import json
-import datetime
+from datetime import datetime
+import time
 
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages org.apache.spark:spark-streaming-kafka-0-8_2.11:2.2.0 pyspark-shell"
 from pyspark import SparkContext
 from pyspark.conf import SparkConf
 from pyspark.streaming import StreamingContext
 from pyspark.streaming.kafka import KafkaUtils
+from pyspark.sql import SQLContext
+from pyspark.sql import SparkSession
+from pyspark.sql.types import *
+from pyspark.sql.types import ArrayType, StringType
+from pyspark.sql.functions import udf, concat, col, lit, unix_timestamp
+from pyspark.ml.feature import StopWordsRemover, Tokenizer
 
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages org.apache.spark:spark-streaming-kafka-0-8_2.11:2.2.0 pyspark-shell"
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config")
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib")
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/preprocess")
-
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/batch_processing")
 import config
 import util
 import locality_sensitive_hash
 import min_hash
 import preprocess
+import batchCustomMinHashLSH as batch_process
 
-# Converts incoming news, Adds timestamp to incoming question
-### NB - a lot of preprocessing needs to be added here
-def extract_data(data):
-    data["ingest_timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
-    return data
 
-def news_preprocess(news):
-    df = news.toDF()
-    # Clean question body
-    clean_body = udf(lambda body: preprocess.filter_body(body), StringType())
-    partially_cleaned_data = df.withColumn("cleaned_body", preprocess.clean_body("body"))
+# schema for converting input news stream RDD[json] to DataFrame
+#input_schema = StructType([StructField(field, StringType(), nullable = True) for field in config.INPUT_SCHEMA_FIELDS])
 
-    # generate tags based on company, industry, and market
-    tag_generator = udf(lambda input_string: preprocess.generate_tag(input_string), ArrayType(StringType()))
-    partially_cleaned_data = partially_cleaned_data.withColumn( "tag_company",  tag_generator("company"))
 
-    # Concat cleaned question body and question title to form question vector
-    data = partially_cleaned_data.withColumn("text_body", concat(col("headline"), lit(" "), col("cleaned_body")))
+def save2redis(iter, news):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    token = "dup_cand:{}".format(news['id'])
+    for entry in iter:
+        processed_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+        dup = (news['headline'], news['timestamp'], entry.id, entry.headline, entry.timestamp,
+                    news['ingest_timestamp'], processed_timestamp)
+        if config.LOG_DEBUG: print("saving dup_cand to Redis: {}".format(dup))
+        rdb.zadd(token, entry.jaccard_sim, dup)
 
-    # Tokenize question title
-    tokenizer = Tokenizer(inputCol="text_body", outputCol="text_body_tokenized")
-    tokenized_data = tokenizer.transform(data)
 
-    # Remove stop words
-    stop_words_remover = StopWordsRemover(inputCol="text_body_tokenized", outputCol="text_body_stop_words_removed")
-    stop_words_removed_data = stop_words_remover.transform(tokenized_data)
 
-    # Stem words
-    stem = udf(lambda tokens: lemmatize(tokens), ArrayType(StringType()))
-    stemmed_data = stop_words_removed_data.withColumn("text_body_stemmed", stem("text_body_stop_words_removed"))
-    final_data = stemmed_data
-    return final_data
+def _ingest_timestamp(data):
+    output = data
+    output['ingest_timestamp'] = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+    return output
 
-def compute_minhash_lsh(df, mh, lsh):
-    calc_min_hash = udf(lambda x: list(map(lambda x: int(x), mh.calc_min_hash_signature(x))), ArrayType(IntegerType()))
-    calc_lsh_hash = udf(lambda x: list(map(lambda x: int(x), lsh.find_lsh_buckets(x))), ArrayType(IntegerType()))
 
-    df = df.withColumn("min_hash", calc_min_hash("text_body_stemmed"))
-    df = df.withColumn("lsh_hash", calc_lsh_hash("min_hash"))
-
-    #if config.LOG_DEBUG: print(df.first())
-    df.foreachPartition(store_lsh_redis_by_topic)
-    return df
 
 def process_news(news, mh, lsh):
-    if len(news)==0: return
+    if config.LOG_DEBUG: print('========= process_news: {} ======='.format(news['headline']))
+
+    q_timestamp = int(news['timestamp'])
+    q_mh = mh.calc_min_hash_signature(news['text_body_stemmed'])
+    q_lsh = lsh.find_lsh_buckets(q_mh)
+
+    """
+    get the dataframe for all news of given tag. id and lsh_hash columns loaded from Redis.
+    """
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    tq = []
+    for tag in news['tag_company']:
+        #tq += rdb.zrangebyscore("lsh:{0}".format(tag),q_timestamp-config.TIME_WINDOW, q_timestamp, withscores=False)
+        for id in rdb.smembers("lsh:{}".format(tag)):
+            temp_lsh       = rdb.hget("news:{}".format(id), 'lsh_hash')
+            temp_mh        = rdb.hget("news:{}".format(id), 'min_hash')
+            temp_timestamp = rdb.hget("news:{}".format(id), 'timestamp')
+            if temp_lsh is not None and temp_mh is not None:
+                temp = {}
+                temp['id'] = id
+                temp['lsh_hash'] = [int(i) for i in temp_lsh.split(',')]
+                temp['min_hash'] = [int(i) for i in temp_mh.split(',')]
+                temp['timestamp'] = int(temp_timestamp)
+                tq.append(temp)
+            else:
+                print("Failed to get lsh_hash for news:{}".format(id))
+    if len(tq) < 1: return
+    df = sql_context.read.json(sc.parallelize(tq))
 
-    news_preprocessed = news_preprocess(news)
-    if config.LOG_DEBUG: print(news_preprocessed.collect())
+    if config.LOG_DEBUG:
+        print("{0} historical news in the tag(s): {1}".format(len(tq), news['tag_company']))
+        df.pprint()
 
-    news_hashed = compute_minhash_lsh(news_preprocessed, mh, lsh)
-    if config.LOG_DEBUG: print(news_hashed.collect())
-
-    # q_id = news["id"]
-    # q_mh = mh.calc_min_hash_signature(news["text_body_stemmed"])
-    # q_lsh = lsh.find_lsh_buckets(q_mh)
-    #
-    # tags = news["tags"].split("|")
-    # max_tag = ""
-    # max_tag_table_size = 0
-    #
-    # for tag in tags:
-    #     # Fetch all questions from that tag
-    #     tq_table_size = rdb.zcard("lsh:{0}".format(tag))
-    #
-    #     # Store tag + news in Redis
-    #     q_json = json.dumps({"id": q_id, "title": news["title"], "min_hash": tuple(q_mh), "lsh_hash": tuple(q_lsh), "timestamp": news["timestamp"]})
-    #     rdb.zadd("lsh:{0}".format(tag), news["view_count"], q_json)
-    #     rdb.sadd("lsh_keys", "lsh:{0}".format(tag))
-    #
-    #     # To find max tag (we're only evaluating this)
-    #     if(tq_table_size > max_tag_table_size):
-    #         max_tag = tag
-    #         max_tag_table_size = tq_table_size
-    #
-    # tag = max_tag
-    #
-    # # Abandon spark parallelization
-    # # can we improve on this?
-    # print("Tag:{0}, Size: {1}".format(max_tag, max_tag_table_size))
-    # if(max_tag_table_size >= config.DUP_QUESTION_MIN_TAG_SIZE):
-    #     print("Comparing in Tag:{0}".format(tag))
-    #     # Too slow
-    #     tq_table = rdb.zrevrange("lsh:{0}".format(tag), 0, config.MAX_QUESTION_COMPARISON, withscores=False)
-    #     tq = [json.loads(tq_entry) for tq_entry in tq_table]
-    #
-    #     for entry in tq:
-    #         if(entry["id"] != q_id):
-    #             lsh_comparison = lsh.common_bands_count(entry["lsh_hash"], q_lsh)
-    #             if(lsh_comparison > config.LSH_SIMILARITY_BAND_COUNT):
-    #                 mh_comparison = mh.jaccard_sim_score(entry["min_hash"], q_mh)
-    #                 print("MH comparison:{0}".format(mh_comparison))
-    #                 if(mh_comparison > config.DUP_QUESTION_MIN_HASH_THRESHOLD):
-    #                     cand_reformatted = (tag, q_id, news["title"], entry["id"], entry["title"], news["timestamp"])
-    #                     print("Found candidate: {0}".format(cand_reformatted))
-    #                     rdb.zadd("dup_cand", mh_comparison, cand_reformatted)
+    udf_num_common_buckets = udf(lambda x: util.sim_count(x, q_lsh), IntegerType())
+    udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, q_mh), FloatType())
+    filtered_df = df.filter((col('timestamp') > (q_timestamp-config.TIME_WINDOW)) & (col('timestamp') < q_timestamp))\
+            .withColumn('common_buckets', udf_num_common_buckets('lsh_hash'))\
+            .filter( col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT)\
+            .withColumn( 'jaccard_sim', udf_get_jaccard_similarity('min_hash'))\
+            .filter( col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+    #if config.LOG_DEBUG: filtered_df.count().map(lambda x: "{} similar news found".format(x))
+    filtered_df.foreachPartition(lambda iter: save2redis(iter, news))
 
 
-# Compute MinHash
-# def process_mini_batch(rdd, mh, lsh):
-#     for news in rdd:
-#         if len(news) > 0:
-#             process_news(news, mh, lsh)
+    """ Store tag + news in Redis """
+    if config.LOG_DEBUG: print('========== Save news data to Redis =============')
+    for tag in news['tag_company']:
+        # rdb.zadd("lsh:{}".format(tag), q.timestamp, json.dumps(news_data))
+        rdb.sadd("lsh:{}".format(tag), news['id'])
+        rdb.sadd("lsh_keys", "lsh:{}".format(tag))
+    news_data = {
+                    "headline": news['headline'],
+                    "min_hash": ",".join([str(i) for i in q_mh]),
+                    "lsh_hash": ",".join([str(i) for i in q_lsh]),
+                    "timestamp": q_timestamp,
+                    "tag_company": ",".join(news["tag_company"])
+                }
+    rdb.hmset("news:{}".format(news['id']), news_data)
+
+
+
+# # Lazily instantiated global instance of SparkSession
+# def getSparkSessionInstance(sparkConf):
+#     if ("sparkSessionSingletonInstance" not in globals()):
+#         globals()["sparkSessionSingletonInstance"] = SparkSession.builder.config(conf=sparkConf).getOrCreate()
+#     return globals()["sparkSessionSingletonInstance"]
+#
+#
+
+
+# def conver_rdd_to_df(rdd, input_schema):
+#     start_time = time.time()
+#     if config.LOG_DEBUG: print("==== Converting RDD[json] to DataFrame ====")
+#     spark = getSparkSessionInstance(rdd.context.getConf())
+#     end_time = time.time()
+#     if config.LOG_DEBUG: print("conver_rdd_to_df run time (seconds): {0} seconds".format(end_time - start_time))
+#     return  spark.createDataFrame(rdd, input_schema)
+
+
+# def process_news(iter):
+#     """
+#     for each news, do the following for similarity comparison:
+#         1) filter news within the pass 3 days
+#         2) filter news with at least one common company tags (intersection)
+#         3) filter news with at least one common band
+#         4) filter news with jaccard sim score above threshold
+#         5) save result to redis and return
+#     """
+#     def helper(iter, news):
+#         rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+#         token = "dup_cand:{}".format(news.id)
+#         for entry in iter:
+#             processed_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+#             dup = tuple(news.headline, news.timestamp, entry.id, entry.headline,
+#                             entry.timestamp, entry.ingest_timestamp, processed_timestamp)
+#             rdb.zadd(token, entry.jaccard_sim, dup)
+#
+#     for news in iter:
+#         try:
+#             if len(news)>0:
+#                 rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+#                 # tags = news["tag_company"]
+#                 tq = []
+#                 for tag in news.tag_company:
+#                     #tq += rdb.zrangebyscore("lsh:{0}".format(tag), "-inf", "+inf", withscores=False)
+#                     tq += rdb.zrangebyscore("lsh:{0}".format(tag), long(news.timestamp)-config.TIME_WINDOW,
+#                                             long(news.timestamp), withscores=False)
+#                 tq = list(set(tq))
+#                 df = sql_context.read.json(sc.parallelize(tq))
+#
+#                 udf_num_common_buckets = udf(lambda x: util.intersection(x, news.lsh_hash), IntegerType())
+#                 udf_get_jaccard_similarity = udf(lambda x: util.jaccard_sim_score(x, news.min_hash), FloatType())
+#                 df.withColumn('common_buckets', udf_num_common_buckets('lsh_hash')).filter(
+#                         col('common_buckets') > config.LSH_SIMILARITY_BAND_COUNT).withColumn(
+#                         'jaccard_sim', udf_get_jaccard_similarity('min_hash')).filter(
+#                         col('jaccard_sim') > config.DUP_QUESTION_MIN_HASH_THRESHOLD)
+#
+#                 if config.LOG_DEBUG:
+#                     df.count().map(lambda x: "{} similar news found".format(x))
+#
+#                 # # Store similar candidates in Redis
+#                 df.foreachPartition(lambda iter: helper(iter, news))
+#         except Exception as e:
+#             print(e)
+
 
 
 def main():
-
     spark_conf = SparkConf().setAppName("Spark Streaming MinHashLSH")
-
     global sc
     sc = SparkContext(conf=spark_conf)
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/locality_sensitive_hash.py")
@@ -138,35 +189,26 @@ def main():
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/lib/util.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/config/config.py")
     sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/preprocess/preprocess.py")
+    sc.addFile(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/batch_processing/batchCustomMinHashLSH.py")
+
+    global sql_context
+    sql_context = SQLContext(sc)
 
     global ssc
     ssc = StreamingContext(sc, config.SPARK_STREAMING_MINI_BATCH_WINDOW)
-    ssc.checkpoint("_spark_streaming_checkpoint")
+    #ssc.checkpoint("_spark_streaming_checkpoint")
 
-    kafka_stream = KafkaUtils.createDirectStream( ssc, [config.KAFKA_TOPIC],
-            {"metadata.broker.list": "ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092"} )
+    mh, lsh = batch_process.load_mh_lsh()
 
-    # Create and save MinHash and LSH or load them from file
-    if (not os.path.isfile(config.MIN_HASH_PICKLE) or not os.path.isfile(config.LSH_PICKLE)):
-        mh = min_hash.MinHash(config.MIN_HASH_K_VALUE)
-        lsh = locality_sensitive_hash.LSH(config.LSH_NUM_BANDS, config.LSH_BAND_WIDTH, config.LSH_NUM_BUCKETS)
+    kafka_stream = KafkaUtils.createDirectStream( ssc,
+                    [config.KAFKA_TOPIC],
+                    {"metadata.broker.list": ",".join(config.KAFKA_SERVERS)} )
 
-        util.save_pickle_file(mh, config.MIN_HASH_PICKLE)
-        util.save_pickle_file(lsh, config.LSH_PICKLE)
-    else:
-        mh = util.load_pickle_file(config.MIN_HASH_PICKLE)
-        lsh = util.load_pickle_file(config.LSH_PICKLE)
+    kafka_stream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
 
-    # Process stream
     kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))\
-        .map(lambda json_body: extract_data(json_body))\
-        .foreachRDD(lambda rdd: rdd.foreachPartition(lambda entry: process_news(entry, mh, lsh)))
-
-    # def _print_rdd(rdd): print(rdd.collect())
-    #
-    # kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1])).map(
-    #     lambda json_body: extract_data(json_body)).foreachRDD(
-    #     lambda rdd: rdd.foreachPartition(lambda entry: process_news(entry, mh, lsh)))
+                .map(lambda data: _ingest_timestamp(data))\
+                .foreachRDD( lambda rdd: rdd.foreach(lambda data: process_news(data, mh, lsh)))
 
     ssc.start()
     ssc.awaitTermination()

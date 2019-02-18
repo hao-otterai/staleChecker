@@ -2,5 +2,20 @@ internal/
 data/
 *.scala
 src/**/*.pickle
+<<<<<<< HEAD
 flaskapp/*.pyc
 flaskapp/**/*.pyc
+=======
+_spark_streaming_checkpoint/
+metastore_db/
+src/ingestion/*.json
+src/preprocess/__pycache__
+src/stream_processing/_spark_streaming_checkpoint
+lib/*.pickle
+lib/__pycache__
+src/batch_processing/spark_warehouse
+src/config/__pycache__
+src/stream_processing/__pycache__
+src/batch_processing/__pycache__
+src/**/*.pyc
+>>>>>>> 7b52d0efc6c15aeb9ade9410344cd040a9e59985

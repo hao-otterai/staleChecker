@@ -1,6 +1,6 @@
 from app import app
 from flask import render_template, redirect
-import datetime
+from datetime import datetime
 import redis
 import math
 from collections import Counter
@@ -12,8 +12,62 @@ import os
 
 REDIS_SERVER = "ec2-54-189-255-59.us-west-2.compute.amazonaws.com"
 DUP_QUESTION_IDENTIFY_THRESHOLD = 0.6
-rdb = redis.StrictRedis(host=REDIS_SERVER, port=6379, db=0)
+DUP_QUESTION_SHOW_THRESHOLD = 0.65
 
+
+''' Utility functions '''
+def calc_likelihood(sim_score):
+    likelihoods = [("Low", "btn-default"), ("Medium", "btn-warning"), ("High", "btn-danger")]
+    print(sim_score)
+    partition = DUP_QUESTION_IDENTIFY_THRESHOLD / (len(likelihoods) - 1)
+    print(partition)
+    print(int(math.floor(sim_score // partition)))
+    return likelihoods[min(len(likelihoods) - 1, int(math.floor(sim_score // partition)))]
+
+
+def sortNewsIdRedis():
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    # rdb.sadd("newsId", news.id)
+    # rdb.hmset("news:{}".format(news.id), save_content)
+    ids = rdb.smembers("newsId")
+    print('number of news ids in newsID: {}'.format(rdb.scard("newsId")))
+    for id in ids:
+        timestamp = rdb.hget("news:{}".format(id), 'timestamp')
+        if timestamp is not None:
+            rdb.zadd("newsIdOrderedByTimestamp", timestamp, id)
+    print('number of news ids in newsIdOrderedByTimestamp: {}'.format(rdb.zcard("newsIdOrderedByTimestamp")))
+
+
+def convertUnixtimestamp(timestamp):
+    try:
+        timestamp = int(timestamp)
+        return datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+    except Exception as e:
+        return str(timestamp)
+
+# def so_link(qid):
+#     return "http://stackoverflow.com/q/{0}".format(qid)
+
+def format_dup_cand(dc):
+    dc_info = eval(dc[0])
+    dc_sim = dc[1]
+    llh_rating, llh_button = calc_likelihood(dc_sim)
+    return {
+        # "timestamp": datetime.now().strftime("%Y-%m-%d %I:%M %p"),
+        "tag": dc_info[0].capitalize(),
+        "q1_id": dc_info[1],
+        "q1_title": dc_info[2],
+        "q2_id": dc_info[3],
+        "q2_title": dc_info[4],
+        "q1_link": so_link(dc_info[1]),
+        "q2_link": so_link(dc_info[3]),
+        "likelihood_button": llh_button,
+        "likelihood_rating": llh_rating,
+        "timestamp": dc_info[5]
+    }
+
+
+''' Routes '''
 @app.route('/')
 @app.route('/index')
 def index():
@@ -29,41 +83,54 @@ def count_me(input_str):
     return '<br>'.join(response)
 
 
+@app.route("/latest")
+def getLatestNews():
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980000000, withscores=True)
+    output = {}
+    for id in ids[:1000]:
+        output[id] = {}
+        news = rdb.hgetall("news:{}".format(id))
+        if news is None:
+            continue
+        try:
+            output['headline'] = news['headline']
+        except Exception as e:
+            continue
+        try:
+            output['body'] = news['body']
+        except Exception as e:
+            pass
+        try:
+            output['tag_company'] = news['tag_company']
+        except Exception as e:
+            pass
+        try:
+            output['timestamp'] = convertUnixtimestamp(news['timestamp'])
+        except Exception as e:
+            pass
 
-''' Utility functions '''
-def calc_likelihood(sim_score):
-    likelihoods = [("Low", "btn-default"), ("Medium", "btn-warning"), ("High", "btn-danger")]
-    print(sim_score)
-    partition = DUP_QUESTION_IDENTIFY_THRESHOLD / (len(likelihoods) - 1)
-    print(partition)
-    print(int(math.floor(sim_score // partition)))
-    return likelihoods[min(len(likelihoods) - 1, int(math.floor(sim_score // partition)))]
+        output['numDups'] = rdb.hlen("dup_cand:{}".format(id))
+        if output['numDups'] > 0:
+            output['dupCands'] = rdb.hgetall("dup_cand:{}".format(id))
+        else:
+            output['dupCands'] = {}
+
+    return render_template("news_list.html", latest=output)
 
 
-# def so_link(qid):
-#     return "http://stackoverflow.com/q/{0}".format(qid)
+@app.route('/dup/<news_id>')
+def getDupCands(news_id):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    dups = "dup_cand:{}".format(id)
 
 
-def format_dup_cand(dc):
-    dc_info = eval(dc[0])
-    dc_sim = dc[1]
-    llh_rating, llh_button = calc_likelihood(dc_sim)
-    return {
-        # "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"),
-        "tag": dc_info[0].capitalize(),
-        "q1_id": dc_info[1],
-        "q1_title": dc_info[2],
-        "q2_id": dc_info[3],
-        "q2_title": dc_info[4],
-        "q1_link": so_link(dc_info[1]),
-        "q2_link": so_link(dc_info[3]),
-        "likelihood_button": llh_button,
-        "likelihood_rating": llh_rating,
-        "timestamp": dc_info[5]
-    }
+@app.route('/news/<news_id>')
+def newsView(news_id):
+    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
+    news = redis.hgetall("news:{}".format(news_id))
 
 
-''' Routes '''
 #@app.route("/")
 @app.route("/candidates")
 def candidates():
@@ -78,6 +145,7 @@ def slides():
 @app.route('/github')
 def github():
     return redirect("https://github.com/haoyang09/staleChecker.git")
+
 
 
 

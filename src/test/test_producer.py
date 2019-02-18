@@ -18,11 +18,11 @@ class Producer(threading.Thread):
                     api_version=(0, 10))
 
         i = 0
-        while i<1000:
+        while i<5000:
             line = "hello world {}".format(i)
             if config.LOG_DEBUG: print(line)
             producer.send(config.KAFKA_TOPIC, line)
-            time.sleep(0.1)
+            time.sleep(0.01)
             i += 1
 
 def main():

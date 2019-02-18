@@ -13,9 +13,6 @@ import config
 
 global sql_context
 
-def custom_extend(a,b): # both a, b are list
-    a.extend(b)
-    return a
 
 # Returns first common tag between two tag lists, may not be the main tag
 def common_tag(x, y):

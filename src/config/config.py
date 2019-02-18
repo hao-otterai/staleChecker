@@ -22,11 +22,11 @@ KAFKA_SERVERS = ["ec2-52-34-80-47.us-west-2.compute.amazonaws.com:9092",
 
 KAFKA_PRODUCER_RATE = 0.2  # seconds
 KAFKA_TOPIC = "dowjones"
-KAFKA_CONSUMER_REFRESH = 0.2  # seconds
+KAFKA_CONSUMER_REFRESH = 0.01  # seconds
 
 
 # Spark settings - streaming, batch
-SPARK_STREAMING_MINI_BATCH_WINDOW = 0.1  # seconds
+SPARK_STREAMING_MINI_BATCH_WINDOW = 0.05  # seconds
 
 
 # Redis settings
@@ -38,7 +38,7 @@ MIN_HASH_K_VALUE = 200
 LSH_NUM_BANDS = 40
 LSH_BAND_WIDTH = 5
 LSH_NUM_BUCKETS = 20
-LSH_SIMILARITY_BAND_COUNT = 5  # Number of common bands needed for MinHash comparison
+LSH_SIMILARITY_BAND_COUNT = 3  # Number of common bands needed for MinHash comparison
 
 
 # Dump files to synchronize models across spark streaming/batch
@@ -47,7 +47,7 @@ LSH_PICKLE = SRC_PATH + "/lib/lsh.pickle"
 
 
 # Duplicate question settings
-DUP_QUESTION_MIN_HASH_THRESHOLD = 0.6
+DUP_QUESTION_MIN_HASH_THRESHOLD = 0.55
 DUP_QUESTION_MIN_TAG_SIZE = 0
 DUP_QUESTION_IDENTIFY_THRESHOLD = 0.55
 QUESTION_POPULARITY_THRESHOLD = 0
@@ -60,3 +60,5 @@ MIN_DOC_FREQ = 2
 
 # time window for news similarity search
 TIME_WINDOW = 432000 #3600*24*3
+
+INPUT_SCHEMA_FIELDS = ['body', 'display_date', 'djn_urgency', 'headline', 'industry', 'id', 'source', 'hot', 'company', 'market']

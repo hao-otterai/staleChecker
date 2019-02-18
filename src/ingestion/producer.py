@@ -1,6 +1,5 @@
 import os
 import sys
-#import smart_open
 import kafka
 import time
 import threading
@@ -11,33 +10,41 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/
 import config
 import util
 
+# from pyspark import SparkContext
+# from pyspark.conf import SparkConf
+# from pyspark.sql import SQLContext
+# from pyspark.streaming import StreamingContext
+# from pyspark.streaming.kafka import KafkaUtils
+
+
 class Producer(threading.Thread):
     def run(self):
         producer = kafka.KafkaProducer(bootstrap_servers=config.KAFKA_SERVERS,
-                     value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+                    value_serializer=lambda v: json.dumps(v).encode('utf-8'),
                     api_version=(0, 10))
 
-        with open('/home/ubuntu/staleChecker/src/ingestion/2001_sample_10M_stream.json') as f:
-            json_file = json.load(f)
-        for line in json_file:
-            if config.LOG_DEBUG: print(line)
-            producer.send(config.KAFKA_TOPIC, line)
+        file_dir = "/home/ubuntu/2001_sample_10M_stream_pre.json"
+        #json_file = sql_context.read.json(file_dir).collect()
+        with open(file_dir) as f: json_file = json.load(f)
 
-        # bucket = util.get_bucket(config.S3_BUCKET_STREAM)
-        # for json_obj in bucket.objects.all():
-        #     json_file = "s3://{0}/{1}".format(config.S3_BUCKET_STREAM, json_obj.key)
-        #     for json_bytes in smart_open.smart_open(json_file):
-        #         for line in json.loads(json_bytes):
-        #             if config.LOG_DEBUG: print(line)
-        #             # time.sleep(config.KAFKA_PRODUCER_RATE)
-        #             producer.send(config.KAFKA_TOPIC, line)
+        fields = ['body', 'display_date', 'djn_urgency', 'headline', 'hot', 'id',
+        'source', 'tag_company', 'text_body', 'text_body_stemmed', 'timestamp']
+        for line in json_file:
+            js = dict(zip(fields, line))
+            if config.LOG_DEBUG: print(js['headline'], js['tag_company'])
+            producer.send(config.KAFKA_TOPIC, js)
+            time.sleep(config.KAFKA_CONSUMER_REFRESH)
 
 def main():
     producer = Producer()
     producer.start()
     print("Starting Kafka Producer...")
-    #print("Starting Kafka Producer: Ingesting at {0} events per second...".format(1.0 / (config.KAFKA_PRODUCER_RATE)))
 
+    # spark_conf = SparkConf().setAppName("Producer")
+    # global sc
+    # sc = SparkContext(conf=spark_conf)
+    # global sql_context
+    # sql_context = SQLContext(sc)
 
 if __name__ == "__main__":
     main()
