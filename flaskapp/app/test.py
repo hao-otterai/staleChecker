@@ -107,8 +107,9 @@ def singleNewsView(news_id):
 
 @app.route('/tag/<tag>')
 def singleTagView(tag):
+    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     ids = rdb.smembers("lsh:{0}".format(tag))
     output = []
-    for id ids:
+    for id in ids[:50]:
         output.append(getNewsDetails(id))
     return render_template("news_detail.html", dup_cands=output)
