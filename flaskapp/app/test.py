@@ -50,18 +50,18 @@ def convertUnixtimestamp(timestamp):
         return str(timestamp)
 
 
-def getNewsDetails(news_id):
-    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
-    news = rdb.hgetall("news:{}".format(news_id))
-    output = {
-        "headline": news['headline'],
-        "body": news['body'],
-        "tag_company": news['tag_company'],
-        "timestamp": convertUnixtimestamp(news['timestamp']),
-        'numDups' = rdb.hlen("dup_cand:{}".format(news_id)),
-        'dupCands' = []
-    }
-    return output
+# def getNewsDetails(news_id):
+#     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
+#     news = rdb.hgetall("news:{}".format(news_id))
+#     output = {
+#         "headline": news['headline'],
+#         "body": news['body'],
+#         "tag_company": news['tag_company'],
+#         "timestamp": convertUnixtimestamp(news['timestamp']),
+#         'numDups' = rdb.hlen("dup_cand:{}".format(news_id)),
+#         'dupCands' = []
+#     }
+#     return output
 
 
 ''' Routes '''
