@@ -105,7 +105,7 @@ def process_news(news, mh, lsh):
         metrics['id'] = news['id']
         metrics['no_tag'] = 'uns' in news['tag_company']
         metrics['ingest_timestamp'] = news['ingest_timestamp'].strftime("%Y-%m-%d %I:%M:%S %p")
-        metrics['time_cost'] = (time.now() - news['ingest_timestamp']).microseconds
+        metrics['time_cost'] = (datetime.now() - news['ingest_timestamp']).microseconds
         metrics['num_comps'] = len(ids)
         metrics['num_dups'] = len(dup_cands)
         rdb.sadd('metrics', json.dumps(metrics))
