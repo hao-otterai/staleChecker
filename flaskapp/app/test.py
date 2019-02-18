@@ -89,7 +89,7 @@ def latestNews():
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     ids = rdb.zrevrangebyscore("newsId", "+inf", 980380000, withscores=False)
     output = []
-    for id in ids[:500]:
+    for id in ids[:250]:
         output.append(getNewsDetails(id))
     return render_template("news_list.html", dup_cands=output)
 

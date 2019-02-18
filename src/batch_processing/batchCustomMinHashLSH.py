@@ -76,10 +76,10 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
         _base = {}
         try:
             _base['timestamp'] = int(rdb.hget('news:{}'.format(_b_id), 'timestamp'))
-            _base['lsh_hash'] = rdb.hget('news:{}'.format(_b_id), 'lsh_hash')
-            _base['lsh_hash'] = _base['lsh_hash'].split(",")
+            # _base['lsh_hash'] = rdb.hget('news:{}'.format(_b_id), 'lsh_hash')
+            # _base['lsh_hash'] = [int(h) for h in _base['lsh_hash'].split(",")]
             _base['min_hash'] = rdb.hget('news:{}'.format(_b_id), 'min_hash')
-            _base['min_hash'] = _base['min_hash'].split(",")
+            _base['min_hash'] = [int(h) for h in _base['min_hash'].split(",")]
         except Exception as e:
             print("ERROR in loading news:{} in get_jacc_sim_and_save_result_redis".format(_b_id), e)
             continue
@@ -106,17 +106,17 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
             (b_id, s_id) = (_s_id, _b_id) if int(_base['timestamp']) < int(_sim['timestamp']) else (_b_id, _s_id)
 
             # lsh_hash bucketing
-            _sim['lsh_hash'] = rdb.hget('news:{}'.format(_s_id), 'lsh_hash')
-            _sim['lsh_hash'] = _sim['lsh_hash'].split(",")
-            band_counts = util.sim_count(_base['lsh_hash'], _sim['lsh_hash'])
-            if config.LOG_DEBUG:
-                print('Common Band Count: {} , {}--{}'.format(band_counts, _b_id, _s_id))
-            if band_counts < config.LSH_SIMILARITY_BAND_COUNT:
-                continue
+            # _sim['lsh_hash'] = rdb.hget('news:{}'.format(_s_id), 'lsh_hash')
+            # _sim['lsh_hash'] = _sim['lsh_hash'].split(",")
+            # band_counts = util.sim_count(_base['lsh_hash'], _sim['lsh_hash'])
+            # if config.LOG_DEBUG:
+            #     print('Common Band Count: {} , {}--{}'.format(band_counts, _b_id, _s_id))
+            # if band_counts < config.LSH_SIMILARITY_BAND_COUNT:
+            #     continue
 
             #calculate jaccard similarity and update redis cache
             _sim['min_hash'] = rdb.hget('news:{}'.format(_s_id), 'min_hash')
-            _sim['min_hash'] = _sim['min_hash'].split(",")
+            _sim['min_hash'] = [int(h) for h in _sim['min_hash'].split(",")]
             jacc_sim = util.jaccard_sim_score(_base['min_hash'], _sim['min_hash'])
             rdb.hset("jacc_sim:{}".format(b_id), s_id, jacc_sim)
 
