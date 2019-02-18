@@ -73,7 +73,7 @@ def getLatestNews():
         except Exception as e:
             pass
         try:
-            temp['tag_company'] = ", ".join(news['tag_company'])
+            temp['tag_company'] = news['tag_company']
         except Exception as e:
             pass
         try:
