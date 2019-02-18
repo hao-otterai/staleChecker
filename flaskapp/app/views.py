@@ -1,5 +1,7 @@
 from app import app
 from flask import render_template, redirect
+from collections import Counter
+
 from datetime import datetime
 import redis
 import math
@@ -8,20 +10,38 @@ import sys
 import os
 
 REDIS_SERVER = "ec2-54-189-255-59.us-west-2.compute.amazonaws.com"
-DUP_QUESTION_IDENTIFY_THRESHOLD = 0.6
-DUP_QUESTION_SHOW_THRESHOLD = 0.65
+
+''' Basic Routes '''
+@app.route('/test')
+def index():
+    return "Hello from flask!"
+
+@app.route('/countme/<input_str>')
+def count_me(input_str):
+    input_counter = Counter(input_str)
+    response = []
+    for letter, count in input_counter.most_common():
+        response.append('"{}": {}'.format(letter, count))
+    return '<br>'.join(response)
+
+@app.route('/slides')
+def slides():
+    return redirect("https://bit.ly/2WOw78n")
+#
+@app.route('/github')
+def github():
+    return redirect("https://github.com/haoyang09/staleChecker.git")
+
+@app.route("/about")
+def about():
+    return render_template("about.html")
+
+@app.route("/metrics")
+def metrics():
+    return render_template("metrics.html")
 
 
-''' Utility functions '''
-def calc_likelihood(sim_score):
-    likelihoods = [("Low", "btn-default"), ("Medium", "btn-warning"), ("High", "btn-danger")]
-    print(sim_score)
-    partition = DUP_QUESTION_IDENTIFY_THRESHOLD / (len(likelihoods) - 1)
-    print(partition)
-    print(int(math.floor(sim_score // partition)))
-    return likelihoods[min(len(likelihoods) - 1, int(math.floor(sim_score // partition)))]
-
-
+''' util functions '''
 def convertUnixtimestamp(timestamp):
     try:
         timestamp = int(timestamp)
@@ -30,27 +50,36 @@ def convertUnixtimestamp(timestamp):
         return str(timestamp)
 
 
+def getNewsDetails(news_id):
+    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
+    res = {}
+    res['id'] = news_id
 
-# def so_link(qid):
-#     return "http://stackoverflow.com/q/{0}".format(qid)
+    news = rdb.hgetall("news:{}".format(news_id))
+    try:
+        res['headline'] = news['headline']
+    except Exception as e:
+        res['headline'] = ''
+    try:
+        res['body'] = news['body']
+    except Exception as e:
+        res['body'] = ''
+    try:
+        res['tag_company'] = news['tag_company'].split(',')
+    except Exception as e:
+        res['tag_company'] = []
+    try:
+        res['timestamp'] = convertUnixtimestamp(news['timestamp'])
+    except Exception as e:
+        res['timestamp'] = ''
+    res['numDups'] = rdb.hlen("dup_cand:{}".format(news_id))
 
-def format_dup_cand(dc):
-    dc_info = eval(dc[0])
-    dc_sim = dc[1]
-    llh_rating, llh_button = calc_likelihood(dc_sim)
-    return {
-        # "timestamp": datetime.now().strftime("%Y-%m-%d %I:%M %p"),
-        "tag": dc_info[0].capitalize(),
-        "q1_id": dc_info[1],
-        "q1_title": dc_info[2],
-        "q2_id": dc_info[3],
-        "q2_title": dc_info[4],
-        "q1_link": so_link(dc_info[1]),
-        "q2_link": so_link(dc_info[3]),
-        "likelihood_button": llh_button,
-        "likelihood_rating": llh_rating,
-        "timestamp": dc_info[5]
-    }
+    if res['numDups'] > 0:
+        res['dupCands'] = rdb.hgetall("dup_cand:{}".format(news_id))
+    else:
+        res['dupCands'] = []
+
+    return res
 
 
 ''' Routes '''
@@ -60,49 +89,27 @@ def latestNews():
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     ids = rdb.zrevrangebyscore("newsId", "+inf", 980380000, withscores=False)
     output = []
-    for id in ids[:500]:
-        temp = {}
-        news = rdb.hgetall("news:{}".format(id))
-
-        if news is None: continue
-
-        temp['id'] = id
-        try:
-            temp['headline'] = news['headline']
-        except Exception as e:
-            continue
-        try:
-            temp['body'] = news['body']
-        except Exception as e:
-            pass
-        try:
-            temp['tag_company'] = news['tag_company'].split(',')
-        except Exception as e:
-            pass
-        try:
-            temp['timestamp'] = convertUnixtimestamp(news['timestamp'])
-        except Exception as e:
-            pass
-        temp['numDups'] = rdb.hlen("dup_cand:{}".format(id))
-        if temp['numDups'] > 0:
-            temp['dupCands'] = rdb.hgetall("dup_cand:{}".format(id))
-        else:
-            temp['dupCands'] = []
-        output.append(temp)
+    for id in ids[:250]:
+        output.append(getNewsDetails(id))
     return render_template("news_list.html", dup_cands=output)
 
 
-# @app.route('/news/<news_id>')
-# def newsView(news_id):
-#     output = getNewsDetails(news_id)
-#     if output['numDups'] > 0:
-#         ids = rdb.hgetall("dup_cand:{}".format(news_id))
-#         for id in ids:
-#             dup = getNewsDetails(id)
-#             output['dupCands'].append(dup)
-#
-#     return render_template("news_detail.html", news=output)
+@app.route('/news/<news_id>')
+def singleNewsView(news_id):
+    news_id = str(news_id)
+    news = getNewsDetails(news_id)
+    news['dupCandDetails'] = []
+    for id in news['dupCands']:
+        news['dupCandDetails'].append(getNewsDetails(id))
 
-# @app.route("/visualization")
-# def visualization():
-#     return render_template("q_cluster_visualization.html")
+    return render_template("news_detail.html", news=news)
+
+
+@app.route('/tag/<tag>')
+def singleTagView(tag):
+    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
+    ids = rdb.smembers("lsh:{0}".format(tag))
+    output = []
+    for id in ids[:50]:
+        output.append(getNewsDetails(id))
+    return render_template("news_detail.html", dup_cands=output)
