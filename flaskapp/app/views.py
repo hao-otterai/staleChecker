@@ -70,7 +70,7 @@ def format_dup_cand(dc):
 @app.route('/latest')
 def latestNews():
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
-    ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980380000, withscores=False)
+    ids = rdb.zrevrangebyscore("newsId", "+inf", 980380000, withscores=False)
     output = []
     for id in ids[:500]:
         temp = {}
