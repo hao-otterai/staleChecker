@@ -59,7 +59,7 @@ def getLatestNews():
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980000000, withscores=False)
     output = []
-    for id in ids[:100]:
+    for id in ids[:500]:
         temp = {}
         news = rdb.hgetall("news:{}".format(id))
         if news is None: continue
@@ -90,7 +90,7 @@ def getLatestNews():
         else:
             temp['dupCands'] = {}
         output.append(temp)
-    return render_template("news_list.html", latest=output)
+    return render_template("news_list.html", latestNews=output)
 
 
 @app.route('/dup/<news_id>')
