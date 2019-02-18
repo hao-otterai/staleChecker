@@ -52,6 +52,7 @@ def store_lsh_redis_by_tag(iter):
 
         for tag in q.tag_company:
             rdb.sadd("lsh:{}".format(tag), q.id)
+            #rdb.zadd("lsh:{}".format(tag), int(q.timestamp), q.id)
             rdb.sadd("lsh_keys", "lsh:{}".format(tag))
 
 

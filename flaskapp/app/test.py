@@ -103,3 +103,12 @@ def singleNewsView(news_id):
         news['dupCandDetails'].append(getNewsDetails(id))
 
     return render_template("news_detail.html", news=news)
+
+
+@app.route('/tag/<tag>')
+def singleTagView(tag):
+    ids = rdb.smembers("lsh:{0}".format(tag))
+    output = []
+    for id ids:
+        output.append(getNewsDetails(id))
+    return render_template("news_detail.html", dup_cands=output)
