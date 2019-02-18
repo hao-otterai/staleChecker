@@ -2,6 +2,15 @@ from app import app
 from flask import render_template, redirect
 from collections import Counter
 
+from datetime import datetime
+import redis
+import math
+
+import sys
+import os
+
+REDIS_SERVER = "ec2-54-189-255-59.us-west-2.compute.amazonaws.com"
+
 ''' Basic Routes '''
 @app.route('/test')
 def index():
@@ -40,6 +49,21 @@ def convertUnixtimestamp(timestamp):
     except Exception as e:
         return str(timestamp)
 
+
+def getNewsDetails(news_id):
+    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
+    news = rdb.hgetall("news:{}".format(news_id))
+    output = {
+        "headline": news['headline'],
+        "body": news['body'],
+        "tag_company": news['tag_company'],
+        "timestamp": convertUnixtimestamp(news['timestamp']),
+        'numDups' = rdb.hlen("dup_cand:{}".format(news_id)),
+        'dupCands' = []
+    }
+    return output
+
+
 ''' Routes '''
 @app.route('/')
 @app.route('/latest')
@@ -77,3 +101,17 @@ def latestNews():
             temp['dupCands'] = []
         output.append(temp)
     return render_template("news_list.html", dup_cands=output)
+
+
+
+@app.route('/news/<news_id>')
+def singleNewsView(news_id):
+    news_id = str(news_id)
+    news = getNewsDetails(news_id)
+    if news['numDups'] > 0:
+        ids = rdb.hgetall("dup_cand:{}".format(news_id))
+        for id in ids:
+            dup = getNewsDetails(id)
+            news['dupCands'].append(dup)
+
+    return render_template("news_detail.html", news=news)

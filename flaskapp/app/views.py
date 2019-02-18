@@ -29,18 +29,7 @@ def convertUnixtimestamp(timestamp):
     except Exception as e:
         return str(timestamp)
 
-def getNewsDetails(news_id):
-    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
-    news = rdb.hgetall("news:{}".format(news_id))
-    output = {
-        "headline": news['headline'],
-        "body": news['body'],
-        "tag_company": news['tag_company'],
-        "timestamp": convertUnixtimestamp(news['timestamp']),
-        'numDups' = rdb.hlen("dup_cand:{}".format(news_id)),
-        'dupCands' = []
-    }
-    return output
+
 
 # def so_link(qid):
 #     return "http://stackoverflow.com/q/{0}".format(qid)
