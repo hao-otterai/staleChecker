@@ -185,13 +185,12 @@ def main():
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
 
     # Fetch all tags from lsh_keys set
-    for lsh_key in rdb.sscan_iter("lsh_keys", match="*", count=500):
-        tag = lsh_key.replace("lsh:", "")
-        if tag == 'uns': continue
-        tq_table_size = rdb.scard("lsh:{0}".format(tag))
-        if tq_table_size < 2: continue
+    tag = 'uns'
+    tq_table_size = rdb.scard("lsh:{0}".format(tag))
+    print('Calculate similarity among {} news with tag {} ...'.format(tq_table_size, tag))
+    if tq_table_size < 2: continue
 
-        find_similar_cands_per_tag(tag, mh, lsh)
+    find_similar_cands_per_tag(tag, mh, lsh)
 
     end_time = time.time()
     print("Spark Custom MinHashLSH run time (seconds): {0} seconds".format(end_time - start_time))
