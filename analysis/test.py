@@ -43,9 +43,7 @@ def getLatestNews():
             temp['dupCands'] = {}
 
         output.append(temp)
-
-    return render_template("news_list.html", latest=output)
-
+    return output
 
 
 def main():
