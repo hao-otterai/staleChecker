@@ -100,7 +100,10 @@ def singleNewsView(news_id):
     news = getNewsDetails(news_id)
     news['dupCandDetails'] = []
     for id in news['dupCands']:
-        news['dupCandDetails'].append(getNewsDetails(id))
+        dup = getNewsDetails(id)
+        # similarity score here
+        dup['sim_score'] = news['dupCands'][id]
+        news['dupCandDetails'].append(dup)
 
     return render_template("news_detail.html", news=news)
 
@@ -108,8 +111,8 @@ def singleNewsView(news_id):
 @app.route('/tag/<tag>')
 def singleTagView(tag):
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
-    ids = rdb.smembers("lsh:{0}".format(tag))
+    ids = rdb.smembers("lsh:{0}".format(str(tag)))
     output = []
     for id in ids[:50]:
         output.append(getNewsDetails(id))
-    return render_template("news_detail.html", dup_cands=output)
+    return render_template("news_list.html", dup_cands=output)
