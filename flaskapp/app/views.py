@@ -64,6 +64,8 @@ def getLatestNews():
         news = rdb.hgetall("news:{}".format(id))
 
         if news is None: continue
+
+        temp['id'] = id
         try:
             temp['headline'] = news['headline']
         except Exception as e:
