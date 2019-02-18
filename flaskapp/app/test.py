@@ -50,18 +50,36 @@ def convertUnixtimestamp(timestamp):
         return str(timestamp)
 
 
-# def getNewsDetails(news_id):
-#     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
-#     news = rdb.hgetall("news:{}".format(news_id))
-#     output = {
-#         "headline": news['headline'],
-#         "body": news['body'],
-#         "tag_company": news['tag_company'],
-#         "timestamp": convertUnixtimestamp(news['timestamp']),
-#         'numDups' = rdb.hlen("dup_cand:{}".format(news_id)),
-#         'dupCands' = []
-#     }
-#     return output
+def getNewsDetails(news_id):
+    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
+    res = {}
+    res['id'] = news_id
+
+    news = rdb.hgetall("news:{}".format(news_id))
+    try:
+        res['headline'] = news['headline']
+    except Exception as e:
+        continue
+    try:
+        res['body'] = news['body']
+    except Exception as e:
+        pass
+    try:
+        res['tag_company'] = news['tag_company'].split(',')
+    except Exception as e:
+        pass
+    try:
+        res['timestamp'] = convertUnixtimestamp(news['timestamp'])
+    except Exception as e:
+        pass
+    res['numDups'] = rdb.hlen("dup_cand:{}".format(news_id))
+
+    if res['numDups'] > 0:
+        res['dupCands'] = rdb.hgetall("dup_cand:{}".format(news_id))
+    else:
+        res['dupCands'] = []
+
+    return res
 
 
 ''' Routes '''
@@ -72,34 +90,7 @@ def latestNews():
     ids = rdb.zrevrangebyscore("newsId", "+inf", 980380000, withscores=False)
     output = []
     for id in ids[:500]:
-        temp = {}
-        news = rdb.hgetall("news:{}".format(id))
-
-        if news is None: continue
-
-        temp['id'] = id
-        try:
-            temp['headline'] = news['headline']
-        except Exception as e:
-            continue
-        try:
-            temp['body'] = news['body']
-        except Exception as e:
-            pass
-        try:
-            temp['tag_company'] = news['tag_company'].split(',')
-        except Exception as e:
-            pass
-        try:
-            temp['timestamp'] = convertUnixtimestamp(news['timestamp'])
-        except Exception as e:
-            pass
-        temp['numDups'] = rdb.hlen("dup_cand:{}".format(id))
-        if temp['numDups'] > 0:
-            temp['dupCands'] = rdb.hgetall("dup_cand:{}".format(id))
-        else:
-            temp['dupCands'] = []
-        output.append(temp)
+        output.append(getNewsDetails(id))
     return render_template("news_list.html", dup_cands=output)
 
 
@@ -107,10 +98,8 @@ def latestNews():
 def singleNewsView(news_id):
     news_id = str(news_id)
     news = getNewsDetails(news_id)
-    if news['numDups'] > 0:
-        ids = rdb.hgetall("dup_cand:{}".format(news_id))
-        for id in ids:
-            dup = getNewsDetails(id)
-            news['dupCands'].append(dup)
+    news['dupCandDetails'] = []
+    for id in news['dupCands']:
+        news['dupCandDetails'].append(getNewsDetails(id))
 
     return render_template("news_detail.html", news=news)
