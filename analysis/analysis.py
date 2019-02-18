@@ -18,7 +18,7 @@ def sortNewsIdRedis():
     for id in ids:
         timestamp = rdb.hget("news:{}".format(id), 'timestamp')
         if timestamp is not None:
-            rdb.zadd("newsIdOrderedByTimestamp", timestamp, id)
+            rdb.zadd("newsIdOrderedByTimestamp", int(timestamp), id)
     print('number of news ids in newsIdOrderedByTimestamp: {}'.format(rdb.zcard("newsIdOrderedByTimestamp")))
 
 
