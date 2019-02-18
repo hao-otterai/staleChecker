@@ -70,20 +70,6 @@ def format_dup_cand(dc):
 ''' Routes '''
 @app.route('/')
 @app.route('/index')
-def index():
-    return "Hello from flask!"
-
-
-@app.route('/countme/<input_str>')
-def count_me(input_str):
-    input_counter = Counter(input_str)
-    response = []
-    for letter, count in input_counter.most_common():
-        response.append('"{}": {}'.format(letter, count))
-    return '<br>'.join(response)
-
-
-@app.route("/latest")
 def getLatestNews():
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980000000, withscores=True)
@@ -146,6 +132,19 @@ def slides():
 def github():
     return redirect("https://github.com/haoyang09/staleChecker.git")
 
+
+@app.route('/test')
+def index():
+    return "Hello from flask!"
+
+
+@app.route('/countme/<input_str>')
+def count_me(input_str):
+    input_counter = Counter(input_str)
+    response = []
+    for letter, count in input_counter.most_common():
+        response.append('"{}": {}'.format(letter, count))
+    return '<br>'.join(response)
 
 
 
