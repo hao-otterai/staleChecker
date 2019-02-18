@@ -103,15 +103,15 @@ def latestNews():
     return render_template("news_list.html", dup_cands=output)
 
 
-
-@app.route('/news/<news_id>')
-def singleNewsView(news_id):
-    news_id = str(news_id)
-    news = getNewsDetails(news_id)
-    if news['numDups'] > 0:
-        ids = rdb.hgetall("dup_cand:{}".format(news_id))
-        for id in ids:
-            dup = getNewsDetails(id)
-            news['dupCands'].append(dup)
-
-    return render_template("news_detail.html", news=news)
+#
+# @app.route('/news/<news_id>')
+# def singleNewsView(news_id):
+#     news_id = str(news_id)
+#     news = getNewsDetails(news_id)
+#     if news['numDups'] > 0:
+#         ids = rdb.hgetall("dup_cand:{}".format(news_id))
+#         for id in ids:
+#             dup = getNewsDetails(id)
+#             news['dupCands'].append(dup)
+#
+#     return render_template("news_detail.html", news=news)
