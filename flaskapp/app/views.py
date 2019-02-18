@@ -11,34 +11,6 @@ import os
 
 REDIS_SERVER = "ec2-54-189-255-59.us-west-2.compute.amazonaws.com"
 
-''' Basic Routes '''
-@app.route('/test')
-def index():
-    return "Hello from flask!"
-
-@app.route('/countme/<input_str>')
-def count_me(input_str):
-    input_counter = Counter(input_str)
-    response = []
-    for letter, count in input_counter.most_common():
-        response.append('"{}": {}'.format(letter, count))
-    return '<br>'.join(response)
-
-@app.route('/slides')
-def slides():
-    return redirect("https://bit.ly/2WOw78n")
-#
-@app.route('/github')
-def github():
-    return redirect("https://github.com/haoyang09/staleChecker.git")
-
-@app.route("/about")
-def about():
-    return render_template("about.html")
-
-@app.route("/metrics")
-def metrics():
-    return render_template("metrics.html")
 
 
 ''' util functions '''
@@ -82,6 +54,36 @@ def getNewsDetails(news_id):
     return res
 
 
+''' Basic Routes '''
+@app.route('/test')
+def index():
+    return "Hello from flask!"
+
+@app.route('/countme/<input_str>')
+def count_me(input_str):
+    input_counter = Counter(input_str)
+    response = []
+    for letter, count in input_counter.most_common():
+        response.append('"{}": {}'.format(letter, count))
+    return '<br>'.join(response)
+
+@app.route('/slides')
+def slides():
+    return redirect("https://bit.ly/2WOw78n")
+#
+@app.route('/github')
+def github():
+    return redirect("https://github.com/haoyang09/staleChecker.git")
+
+@app.route("/about")
+def about():
+    return render_template("about.html")
+
+@app.route("/metrics")
+def metrics():
+    return render_template("metrics.html")
+
+
 ''' Routes '''
 @app.route('/')
 @app.route('/latest')
@@ -108,10 +110,10 @@ def singleNewsView(news_id):
     return render_template("news_detail.html", news=news)
 
 
-@app.route('/tag/<tag>')
-def singleTagView(tag):
+@app.route('/tag/<tag_name>')
+def singleTagView(tag_name):
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
-    ids = rdb.smembers("lsh:{0}".format(str(tag)))
+    ids = rdb.smembers("lsh:{0}".format(str(tag_name)))
     output = []
     for id in ids[:50]:
         output.append(getNewsDetails(id))
