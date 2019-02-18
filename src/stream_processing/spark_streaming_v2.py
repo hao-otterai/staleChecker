@@ -119,10 +119,11 @@ def process_news(news, mh, lsh):
     rdb.hmset("news:{}".format(news['id']),
                 {
                     "headline": news['headline'],
-                    "min_hash": ",".join([str(i) for i in q_mh]),
-                    "lsh_hash": ",".join([str(i) for i in q_lsh]),
+                    "body": news['body'],
                     "timestamp": news['timestamp'],
-                    "tag_company": ",".join(news["tag_company"])
+                    "tag_company": ",".join(news["tag_company"]),
+                    "min_hash": ",".join([str(i) for i in q_mh]),
+                    "lsh_hash": ",".join([str(i) for i in q_lsh])                    
                 }
             )
 

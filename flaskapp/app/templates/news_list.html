@@ -5,20 +5,19 @@
     <table class="table table-striped">
       <thead>
         <tr>
-          <!-- <th>Timestamp</th> -->
-          <th>Tag</th>
-          <th>Potential Duplicate News</th>
-          <th>Matching News</th>
-          <th>Staleness Likelihood</th>
+          <th>Timestamp</th>
+          <th>Latest News</th>
+          <th>No. Similar News</th>
+          <th>Tags</th>
         </tr>
       </thead>
       <tbody>
-        {% for dup_pair in dup_cands %}
+        {% for news in latest %}
           <tr>
-            <!-- <td> {{ dup_pair["timestamp"] }} </td> -->
-            <td> <b> {{ dup_pair["tag"] }} <b> </td>
-            <td> {{ dup_pair["q1_headline"] }}</td>
-            <td> {{ dup_pair["q2_headline"] }}</td>
+            <td> {{ news["timestamp"] }} </td>
+            <td> {{ news["headline"] }}</td>
+            <td> {{ news["numDups"] }}</td>
+            <td> {{ news["tag_company"][0] }}</td>
             <!-- <td> {{ dup_pair["q1_headline"] }} <a class="so_link" href="{{ dup_pair['q1_link'] }}">Stack Overflow</a> </td>  -->
             <!-- <td> {{ dup_pair["q2_headline"] }} <a class="so_link" href="{{ dup_pair['q2_link'] }}">Stack Overflow</a> </td>  -->
             <!-- <td> <button type="button" class="btn btn-xs {{ dup_pair['likelihood_button']}}">{{ dup_pair["likelihood_rating"] }} </button></td>  -->
