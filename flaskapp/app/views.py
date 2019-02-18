@@ -30,6 +30,19 @@ def convertUnixtimestamp(timestamp):
     except Exception as e:
         return str(timestamp)
 
+def getNewsDetails(news_id):
+    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
+    news = rdb.hgetall("news:{}".format(news_id))
+    output = {
+        "headline": news['headline'],
+        "body": news['body'],
+        "tag_company": news['tag_company'],
+        "timestamp": convertUnixtimestamp(news['timestamp']),
+        'numDups' = rdb.hlen("dup_cand:{}".format(news_id)),
+        'dupCands' = [],
+    }
+    return output
+
 # def so_link(qid):
 #     return "http://stackoverflow.com/q/{0}".format(qid)
 
@@ -55,7 +68,7 @@ def format_dup_cand(dc):
 ''' Routes '''
 @app.route('/')
 @app.route('/latest')
-def getLatestNews():
+def latestNews():
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980380000, withscores=False)
     output = []
@@ -91,24 +104,17 @@ def getLatestNews():
     return render_template("news_list.html", dup_cands=output)
 
 
-@app.route('/dup/<news_id>')
-def getDupCands(news_id):
-    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
-    dups = "dup_cand:{}".format(id)
-
-
 @app.route('/news/<news_id>')
 def newsView(news_id):
-    rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
-    news = redis.hgetall("news:{}".format(news_id))
+    output = getNewsDetails(news_id)
+    if output['numDups'] > 0:
+        ids = rdb.hgetall("dup_cand:{}".format(news_id))
+        for id in ids:
+            dup = getNewsDetails(id)
+            output['dupCands'].append(dup)
 
+    return render_template("news_detail.html", news=output)
 
-#@app.route("/")
-@app.route("/candidates")
-def candidates():
-    all_cands = rdb.zrevrangebyscore("dup_cand", "+inf", DUP_QUESTION_SHOW_THRESHOLD, withscores=True)
-    dup_cands = [format_dup_cand(dc) for dc in all_cands]
-    return render_template("q_list.html", dup_cands=dup_cands)
 
 @app.route('/slides')
 def slides():

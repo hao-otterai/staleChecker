@@ -87,14 +87,12 @@ def process_news(news, mh, lsh):
 
             # LSH bucketing
             comp['lsh_hash'] = [int(i) for i in comp['lsh_hash'].split(',')]
-            if util.sim_count(q_lsh, temp_lsh) < config.LSH_SIMILARITY_BAND_COUNT:
+            if util.sim_count(q_lsh, comp['lsh_hash']) < config.LSH_SIMILARITY_BAND_COUNT:
                 continue
 
             # Jaccard similarity calculation
-            temp_mh   = rdb.hget("news:{}".format(id), 'min_hash')
-            if temp_mh is None: continue
-            temp_mh = [int(i) for i in temp_mh.split(',')]
-            jaccard_sim = util.jaccard_sim_score(q_mh, temp_mh)
+            comp['lsh_hash'] = [int(i) for i in comp['lsh_hash'].split(',')]
+            jaccard_sim = util.jaccard_sim_score(q_mh, comp['lsh_hash'])
             if jaccard_sim < config.DUP_QUESTION_MIN_HASH_THRESHOLD: continue
 
             dup_cands[id] = jaccard_sim

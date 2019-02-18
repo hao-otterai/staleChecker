@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block staleChecker_info %}
- <h1 class="page-header">Latest News</h1>
+ <h1 class="page-header">{{ news['headline'] }}</h1>
   <div class="table-responsive">
     <table class="table table-striped">
       <thead>
@@ -12,12 +12,12 @@
         </tr>
       </thead>
       <tbody>
-        {% for news in dup_cands %}
+        {% for dup in news['dupCands'] %}
           <tr>
-            <td> {{ news["timestamp"] }} </td>
-            <td> <a class="news_link" href="/news/{{ news['id'] }}">{{ news["headline"] }}</a></td>
-            <td> {{ news["numDups"] }}</td>
-            <td> {{ news["tag_company"] }}</td>
+            <td> {{ dup["timestamp"] }} </td>
+            <td> <a class="news_link" href="/news/{{ dup['id'] }}">{{ dup["headline"] }}</a></td>
+            <td> {{ dup["numDups"] }}</td>
+            <td> {{ dup["tag_company"] }}</td>
           </tr>
         {% endfor %}
       </tbody>
