@@ -41,9 +41,8 @@ def load_mh_lsh():
 # Store news data
 def store_lsh_redis_by_tag(iter):
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-    if config.LOG_DEBUG: print("store minhash and lsh by company tag")
     for q in iter:
-        if config.LOG_DEBUG: print(q.headline)
+        if config.LOG_DEBUG: print("Save min & lash-hash to Redis - {}".format(q.headline))
         rdb.hmset("news:{}".format(q.id),
                     {
                         "min_hash": ','.join(str(x) for x in q.min_hash),
@@ -71,11 +70,14 @@ def compute_minhash_lsh(df, mh, lsh):
 
 
 def get_jacc_sim_and_save_result_redis(candidate_set):
+    if config.LOG_DEBUG: print("get_jacc_sim_and_save_result_redis")
+
     rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
     for idx, _b_id in enumerate(candidate_set):
         _base = {}
         try:
             _base['timestamp'] = int(rdb.hget('news:{}'.format(_b_id), 'timestamp'))
+            _base['headline'] = rdb.hget('news:{}'.format(_b_id), 'headline')
             # _base['lsh_hash'] = rdb.hget('news:{}'.format(_b_id), 'lsh_hash')
             # _base['lsh_hash'] = [int(h) for h in _base['lsh_hash'].split(",")]
             _base['min_hash'] = rdb.hget('news:{}'.format(_b_id), 'min_hash')
@@ -88,43 +90,51 @@ def get_jacc_sim_and_save_result_redis(candidate_set):
         _s_ids = [iid for iid in candidate_set[idx+1:] if iid not in rdb.hgetall('jacc_sim:{}'.format(_b_id))]
 
         for _s_id in _s_ids:
-            _sim  = {}
             # skip those whose jacc_sim already calculated
-            if rdb.hget('jacc_sim:{}'.format(_s_id), _b_id) is not None:
-                continue
+            jacc_sim = rdb.hget('jacc_sim:{}'.format(_s_id), _b_id)
+            if  jacc_sim is not None:
+                b_id, s_id = _s_id, _b_id
+            else:
+                _sim  = {}
+                # first of all, analyze timestamp to determine which news come later.
+                # and apply time windowing filter
+                _sim['headline'] = rdb.hget('news:{}'.format(_s_id), 'headline')
+                try:
+                    _sim['timestamp'] = int(rdb.hget('news:{}'.format(_s_id), 'timestamp'))
+                except Exception as e:
+                    continue
 
-            # first of all, analyze timestamp to determine which news come later.
-            # and apply time windowing filter
-            try:
-                _sim['timestamp'] = int(rdb.hget('news:{}'.format(_s_id), 'timestamp'))
-            except Exception as e:
-                continue
-            # skip if timestamp difference is larger than time window
-            if abs(_base['timestamp'] - _sim['timestamp']) > config.TIME_WINDOW:
-                continue
-            # base is the news which appear later
-            (b_id, s_id) = (_s_id, _b_id) if int(_base['timestamp']) < int(_sim['timestamp']) else (_b_id, _s_id)
+                # skip if timestamp difference is larger than time window
+                if abs(_base['timestamp'] - _sim['timestamp']) > config.TIME_WINDOW:
+                    continue
 
-            # lsh_hash bucketing
-            # _sim['lsh_hash'] = rdb.hget('news:{}'.format(_s_id), 'lsh_hash')
-            # _sim['lsh_hash'] = _sim['lsh_hash'].split(",")
-            # band_counts = util.sim_count(_base['lsh_hash'], _sim['lsh_hash'])
-            # if config.LOG_DEBUG:
-            #     print('Common Band Count: {} , {}--{}'.format(band_counts, _b_id, _s_id))
-            # if band_counts < config.LSH_SIMILARITY_BAND_COUNT:
-            #     continue
+                # base is the news which appear later
+                if _base['timestamp'] < _sim['timestamp']:
+                    b_id, s_id = _s_id, _b_id
+                else:
+                    b_id, s_id = _b_id, _s_id
 
-            #calculate jaccard similarity and update redis cache
-            _sim['min_hash'] = rdb.hget('news:{}'.format(_s_id), 'min_hash')
-            _sim['min_hash'] = [int(h) for h in _sim['min_hash'].split(",")]
-            jacc_sim = util.jaccard_sim_score(_base['min_hash'], _sim['min_hash'])
-            rdb.hset("jacc_sim:{}".format(b_id), s_id, jacc_sim)
+                # lsh_hash bucketing
+                # _sim['lsh_hash'] = rdb.hget('news:{}'.format(_s_id), 'lsh_hash')
+                # _sim['lsh_hash'] = _sim['lsh_hash'].split(",")
+                # band_counts = util.sim_count(_base['lsh_hash'], _sim['lsh_hash'])
+                # if config.LOG_DEBUG:
+                #     print('Common Band Count: {} , {}--{}'.format(band_counts, _b_id, _s_id))
+                # if band_counts < config.LSH_SIMILARITY_BAND_COUNT:
+                #     continue
+
+                #calculate jaccard similarity and update redis cache
+                _sim['min_hash'] = rdb.hget('news:{}'.format(_s_id), 'min_hash')
+                _sim['min_hash'] = [int(h) for h in _sim['min_hash'].split(",")]
+                jacc_sim = util.jaccard_sim_score(_base['min_hash'], _sim['min_hash'])
+                rdb.hset("jacc_sim:{}".format(b_id), s_id, jacc_sim)
+
 
             # if jaccard_sim is above threshold, save as dup_cand to Redis
             if jacc_sim > config.DUP_QUESTION_MIN_HASH_THRESHOLD:
                 rdb.hset("dup_cand:{}".format(b_id), s_id, jacc_sim)
                 if config.LOG_DEBUG:
-                    print('Dup candidate {}, {}---{}'.format(jacc_sim,  _b_id, _s_id))
+                    print('Dup candidate {}, {}---{}'.format(jacc_sim,  b_id, s_id))
 
 
 
@@ -199,6 +209,9 @@ def main():
     end_time = time.time()
     print("Spark Custom MinHashLSH run time (seconds): {0} seconds".format(end_time - start_time))
 
+    # optional: run batch for tag uns (those without tag)
+    # tag = 'uns'
+    # find_similar_cands_per_tag(tag, mh, lsh)
 
 if(__name__ == "__main__"):
     main()

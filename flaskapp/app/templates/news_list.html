@@ -15,7 +15,7 @@
         {% for news in dup_cands %}
           <tr>
             <td> {{ news["timestamp"] }} </td>
-            <td> {{ news["headline"] }} </td>
+            <td> <a class="news_link" href="/news/{{news['id']}}">{{ news["headline"] }}</a></td>
             <td> {{ news["numDups"] }} </td>
             <td> {{ news["tag_company"] }} </td>
           </tr>
