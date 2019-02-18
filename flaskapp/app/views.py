@@ -59,7 +59,7 @@ def getLatestNews():
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980000000, withscores=False)
     output = []
-    for id in ids[:1000]:
+    for id in ids[:100]:
         temp = {}
         news = rdb.hgetall("news:{}".format(id))
         if news is None: continue
