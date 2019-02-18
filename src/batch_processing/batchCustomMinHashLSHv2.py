@@ -166,6 +166,7 @@ def main():
     # Fetch all tags from lsh_keys set
     for lsh_key in rdb.sscan_iter("lsh_keys", match="*", count=500):
         tag = lsh_key.replace("lsh:", "")
+        #if tag == 'uns': continue
         tq_table_size = rdb.scard("lsh:{0}".format(tag))
         if tq_table_size < 2: continue
 

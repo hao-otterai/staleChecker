@@ -46,7 +46,7 @@ def save2redis(iter, news):
 
 def _ingest_timestamp(data):
     output = data
-    output['ingest_timestamp'] = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+    output['ingest_timestamp'] = datetime.now()#.strftime("%Y-%m-%d %I:%M:%S %p")
     return output
 
 
@@ -56,7 +56,7 @@ def process_news(news, mh, lsh):
     if config.LOG_DEBUG:
         print('========= process_news: {} ======='.format(news['headline']))
 
-    q_timestamp = int(news['timestamp'])
+    news['timestamp'] = int(news['timestamp'])
     q_mh = mh.calc_min_hash_signature(news['text_body_stemmed'])
     q_lsh = lsh.find_lsh_buckets(q_mh)
 
@@ -75,16 +75,20 @@ def process_news(news, mh, lsh):
 
         for id in ids:
             # time windowing
-            temp_timestamp = rdb.hget("news:{}".format(id), 'timestamp')
-            if temp_timestamp is None: continue
-            temp_timestamp = int(temp_timestamp)
-            if temp_timestamp > q_timestamp or temp_timestamp < (q_timestamp-config.TIME_WINDOW): continue
+            comp = rdb.hgetall("news:{}".format(id))
+            if comp is None:
+                if config.LOG_DEBUG: print('no timestamp found in news:{}'.format(id))
+                continue
+
+            comp['timestamp'] = int(comp['timestamp'])
+            if comp['timestamp'] > news['timestamp'] or \
+                comp['timestamp'] < (news['timestamp']-config.TIME_WINDOW):
+                continue
 
             # LSH bucketing
-            temp_lsh  = rdb.hget("news:{}".format(id), 'lsh_hash')
-            if temp_lsh is  None: continue
-            temp_lsh = [int(i) for i in temp_lsh.split(',')]
-            if util.sim_count(q_lsh, temp_lsh) < config.LSH_SIMILARITY_BAND_COUNT: continue
+            comp['lsh_hash'] = [int(i) for i in comp['lsh_hash'].split(',')]
+            if util.sim_count(q_lsh, temp_lsh) < config.LSH_SIMILARITY_BAND_COUNT:
+                continue
 
             # Jaccard similarity calculation
             temp_mh   = rdb.hget("news:{}".format(id), 'min_hash')
@@ -99,13 +103,14 @@ def process_news(news, mh, lsh):
         if len(dup_cands)>0: rdb.hmset('dup_cand:{}'.format(news['id']), dup_cands)
 
         # log streaming performance metrics to Redis
-        _metrics = {}
-        _metrics['id'] = news['id']
-        _metrics['ingest_timestamp'] = news['ingest_timestamp']
-        _metrics['consum_timestamp'] = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-        _metrics['num_comps'] = len(ids)
-        _metrics['num_dups'] = len(dup_cands)
-        rdb.sadd('metrics', json.dumps(_metrics))
+        metrics = {}
+        metrics['id'] = news['id']
+        metrics['no_tag'] = 'uns' in news['tag_company']
+        metrics['ingest_timestamp'] = news['ingest_timestamp'].strftime("%Y-%m-%d %I:%M:%S %p")
+        metrics['time_cost'] = (time.now() - news['ingest_timestamp']).microseconds
+        metrics['num_comps'] = len(ids)
+        metrics['num_dups'] = len(dup_cands)
+        rdb.sadd('metrics', json.dumps(metrics))
 
     # save input news to Redis
     for tag in news['tag_company']:
@@ -116,13 +121,19 @@ def process_news(news, mh, lsh):
                     "headline": news['headline'],
                     "min_hash": ",".join([str(i) for i in q_mh]),
                     "lsh_hash": ",".join([str(i) for i in q_lsh]),
-                    "timestamp": q_timestamp,
+                    "timestamp": news['timestamp'],
                     "tag_company": ",".join(news["tag_company"])
                 }
             )
 
 
 def main():
+
+    def _helper(iterator, mh, lsh):
+        for news in iterator:
+            if len(news)>0: #and 'uns' not in news['tag_company']:
+                process_news(_ingest_timestamp(news), mh, lsh )
+
     spark_conf = SparkConf().setAppName("Spark Streaming MinHashLSH")
     global sc
     sc = SparkContext(conf=spark_conf)
@@ -147,14 +158,7 @@ def main():
                     {"metadata.broker.list": ",".join(config.KAFKA_SERVERS)} )
 
     kafka_stream.count().map(lambda x:('==== {} news in mini-batch ===='.format(x))).pprint()
-
-    def _helper(iterator, mh, lsh):
-        for news in iterator:
-            if len(news)>0:
-                process_news(news, mh, lsh )
-
     kafka_stream.map(lambda kafka_response: json.loads(kafka_response[1]))\
-                .map(lambda data: _ingest_timestamp(data))\
                 .foreachRDD( lambda rdd: rdd.foreachPartition(lambda iterator: _helper(iterator, mh, lsh)))
 
     ssc.start()
