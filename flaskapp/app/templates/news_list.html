@@ -7,8 +7,8 @@
         <tr>
           <th>Timestamp</th>
           <th>News Headline</th>
-          <th>No. Similar News</th>
-          <th>Tags</th>
+          <!-- <th>No. Similar News</th>
+          <th>Tags</th> -->
         </tr>
       </thead>
       <tbody>
@@ -16,11 +16,8 @@
           <tr>
             <td> {{ news["timestamp"] }} </td>
             <td> {{ news["headline"] }}</td>
-            <td> {{ news["numDups"] }}</td>
-            <td> {{ news["tag_company"] }}</td>
-            <!-- <td> {{ dup_pair["q1_headline"] }} <a class="so_link" href="{{ dup_pair['q1_link'] }}">Stack Overflow</a> </td>  -->
-            <!-- <td> {{ dup_pair["q2_headline"] }} <a class="so_link" href="{{ dup_pair['q2_link'] }}">Stack Overflow</a> </td>  -->
-            <!-- <td> <button type="button" class="btn btn-xs {{ dup_pair['likelihood_button']}}">{{ dup_pair["likelihood_rating"] }} </button></td>  -->
+            <!-- <td> {{ news["numDups"] }}</td>
+            <td> {{ news["tag_company"] }}</td> -->
           </tr>
         {% endfor %}
       </tbody>

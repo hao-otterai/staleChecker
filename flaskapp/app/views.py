@@ -62,7 +62,7 @@ def getLatestNews():
     for id in ids[:500]:
         temp = {}
         news = rdb.hgetall("news:{}".format(id))
-        
+
         if news is None: continue
         try:
             temp['headline'] = news['headline']
@@ -84,9 +84,9 @@ def getLatestNews():
         if temp['numDups'] > 0:
             temp['dupCands'] = rdb.hgetall("dup_cand:{}".format(id))
         else:
-            temp['dupCands'] = {}
+            temp['dupCands'] = []
         output.append(temp)
-    return render_template("news_list.html", latestNews=output)
+    return render_template("news_list.html", dup_cands=output)
 
 
 @app.route('/dup/<news_id>')
