@@ -13,7 +13,7 @@ def convertUnixtimestamp(timestamp):
 
 def getLatestNews():
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
-    ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980000000, withscores=True)
+    ids = rdb.zrevrangebyscore("newsIdOrderedByTimestamp", "+inf", 980000000, withscores=False)
     output = {}
     for id in ids[:10]:
         output[id] = {}
