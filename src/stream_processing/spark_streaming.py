@@ -91,8 +91,8 @@ def process_news(news, mh, lsh):
                 continue
 
             # Jaccard similarity calculation
-            comp['lsh_hash'] = [int(i) for i in comp['lsh_hash'].split(',')]
-            jaccard_sim = util.jaccard_sim_score(q_mh, comp['lsh_hash'])
+            comp['min_hash'] = [int(i) for i in comp['min_hash'].split(',')]
+            jaccard_sim = util.jaccard_sim_score(q_mh, comp['min_hash'])
             if jaccard_sim < config.DUP_QUESTION_MIN_HASH_THRESHOLD: continue
 
             dup_cands[id] = jaccard_sim
