@@ -114,24 +114,6 @@ def latestNews():
 #
 #     return render_template("news_detail.html", news=output)
 
-
-
-@app.route('/slides')
-def slides():
-    return redirect("https://bit.ly/2WOw78n")
-#
-@app.route('/github')
-def github():
-    return redirect("https://github.com/haoyang09/staleChecker.git")
-
-@app.route("/about")
-def about():
-    return render_template("about.html")
-
-@app.route("/metrics")
-def metrics():
-    return render_template("metrics.html")
-
 # @app.route("/visualization")
 # def visualization():
 #     return render_template("q_cluster_visualization.html")
