@@ -91,7 +91,7 @@ def latestNews():
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     ids = rdb.zrevrangebyscore("newsId", "+inf", 980380000, withscores=False)
     output = []
-    for id in ids[:250]:
+    for id in ids[:300]:
         output.append(getNewsDetails(id))
     return render_template("news_list.html", dup_cands=output)
 
@@ -113,8 +113,7 @@ def singleNewsView(news_id):
 @app.route('/tag/<tag_name>')
 def singleTagView(tag_name):
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
-    ids = rdb.smembers("lsh:{0}".format(str(tag_name)))
     output = []
-    for id in ids[:50]:
+    for id in rdb.smembers("lsh:{0}".format(str(tag_name))):
         output.append(getNewsDetails(id))
     return render_template("news_list.html", dup_cands=output)
