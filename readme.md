@@ -21,12 +21,6 @@ In this project, I implemented a customized MinHash - Locality Sensitive Hashing
 ### Data Source
  - Real time financial news data APIs are typically not free. In this project, I chose a subset of historical Dow Jones News XML dump for demo purposes. To build a real news app in future, integration with some source of real-time news API is required.
 
-
-### Engineering Challenge
-
-
-
-
 ### references
 [1] [Financial research publication: When Can the Market Identify Old News](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2433234)
 
