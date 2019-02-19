@@ -11,12 +11,12 @@ Stale news can appear in various forms, including not only rewrite and recombina
 In this project, I implemented a customized MinHash - Locality Sensitive Hashing (LSH) in Spark and Spark Streaming to find news text similarity. This project also make use of the fact that **only staleness check among news within a time-window of past few days and with the same stock symbol is needed**. Therefore, implementing a vanilla MinHash LSH in spark allows for max flexibiliy in implementing such an idea. 
 
 ### Implementation
+![pipeline](https://github.com/haoyang09/staleChecker/blob/master/pipeline.png)
 - Kafka: Ingesting data from news source.
 - Spark: Batch pre-process of historical news, including data cleaning, tokenizing, and hashing.
 - Spark Streaming: distributed processing, in-memory operations.
 - Redis: In-memory key-value storage to support real-time application.
 - Flask: web app of financial news.
-
 
 ### Data Source
  - Real time financial news data APIs are typically not free. In this project, I chose a subset of historical Dow Jones News XML dump for demo purposes. To build a real news app in future, integration with some source of real-time news API is required.
