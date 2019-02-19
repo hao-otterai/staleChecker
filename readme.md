@@ -1,4 +1,4 @@
-## StaleTrader
+## staleChecker
 Real-time identification of news staleness to help investors avoid overreaction to stale information.
 
 ### Project Idea
