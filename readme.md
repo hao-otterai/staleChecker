@@ -1,41 +1,33 @@
 ## StaleTrader
-Live stream and real-time identification of news staleness to help investors avoid overreaction to stale and rewrite news
+Real-time identification of news staleness to help investors avoid overreaction to stale information.
 
 ### Project Idea
-It has been documented in finance journals that investors tend to Overreact to stale news, news reprint and rewrite, as well as
-related content on social media.
+Stale news can appear in various forms, including not only rewrite and recombination of stale news from news organization, but also content from social media. It has been studied by various financial research publications that investors tend to overreact to stale news. Research indicate that overreaction to stale news is usually followed by an immediate correction in the next few days, resulting in investors' loss in the short term.  Depending on who you are and how you utilize such pheonemana, identifying news "staleness" in real-time is important. For example: 
 
-### Tech Stack
-- Kafka: Ingesting data from news source APIs.
-- Spark Streaming: distributed processing, fine-grained load balancing, failure recovery, in-memory operations.
-- ElasticSearch: text similarity search to identify if highly similar news exist.
-- RethinkDB: key-value storage database which support real-time application.
-- Flask: app for result demo
+- Hedge funds can exploit it as a reverse trading signal to profit in the short term, i.e., selling on positive stale news and buying on negative stale news. 
+- Retail investors, knowing the staleness of news in real-time can help them reduce if not completely avoid overraction to stale information.  
+- News aggregration app can server its consumers better by providing a "stalness" indicator to financial news, etc.
+
+In this project, I implemented a customized MinHash - Locality Sensitive Hashing (LSH) in Spark and Spark Streaming to find news text similarity. This project also make use of the fact that **only staleness check among news within a time-window of past few days and with the same stock symbol is needed**. Therefore, implementing a vanilla MinHash LSH in spark allows for max flexibiliy in implementing such an idea. 
+
+### Implementation
+- Kafka: Ingesting data from news source.
+- Spark: Batch pre-process of historical news, including data cleaning, tokenizing, and hashing.
+- Spark Streaming: distributed processing, in-memory operations.
+- Redis: In-memory key-value storage to support real-time application.
+- Flask: web app of financial news.
 
 
 ### Data Source
- - financial news data - Dow Jones News archive XML dump
+ - Real time financial news data APIs are typically not free. In this project, I chose a subset of historical Dow Jones News XML dump for demo purposes. To build a real news app in future, integration with some source of real-time news API is required.
 
 
 ### Engineering Challenge
 
 
-## Business Value
 
-
-### MVP
- - ETL for preprocessing input text files
- - Setting up a parameter for storing and updating word rectors
- - Build a scalable distributed training pipeline for word vectors on reasonable sized data.
-
-
-### Quick Start
- (instructions added later)
-
-
-### Stretch Goals
 
 ### references
-https://towardsdatascience.com/understanding-locality-sensitive-hashing-49f6d1f6134
-https://santhoshhari.github.io/Locality-Sensitive-Hashing/
-https://eng.uber.com/lsh/
+[1] https://towardsdatascience.com/understanding-locality-sensitive-hashing-49f6d1f6134
+[2] https://santhoshhari.github.io/Locality-Sensitive-Hashing/
+[3] https://eng.uber.com/lsh/
