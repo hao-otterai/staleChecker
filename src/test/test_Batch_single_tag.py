@@ -27,7 +27,7 @@ def main():
         print('Failed: Tag not in lsh_keys')
         return
 
-    tq_table_size = rdb.scard("lsh:{0}".format(tag))
+    tq_table_size = rdb.zcard("lsh:{0}".format(tag))
 
     mh, lsh = batch.load_mh_lsh()
 

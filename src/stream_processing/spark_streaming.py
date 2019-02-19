@@ -32,18 +32,6 @@ import batchCustomMinHashLSH as batch_process
 #input_schema = StructType([StructField(field, StringType(), nullable = True) for field in config.INPUT_SCHEMA_FIELDS])
 
 
-def save2redis(iter, news):
-    rdb = redis.StrictRedis(config.REDIS_SERVER, port=6379, db=0)
-    token = "dup_cand:{}".format(news['id'])
-    for entry in iter:
-        processed_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-        dup = (news['headline'], news['timestamp'], entry.id, entry.headline, entry.timestamp,
-                    news['ingest_timestamp'], processed_timestamp)
-        if config.LOG_DEBUG: print("saving dup_cand to Redis: {}".format(dup))
-        rdb.zadd(token, entry.jaccard_sim, dup)
-
-
-
 def _ingest_timestamp(data):
     output = data
     output['ingest_timestamp'] = datetime.now()#.strftime("%Y-%m-%d %I:%M:%S %p")
@@ -67,7 +55,9 @@ def process_news(news, mh, lsh):
     dup_cands = {}
     ids = set()
     for tag in news['tag_company']:
-        ids = ids.union(rdb.smembers("lsh:{}".format(tag)))
+        # temp = rdb.smembers("lsh:{0}".format(tag))
+        temp = rdb.zrangebyscore("lsh:{0}".format(tag), '-inf', '+inf', withscores=False)
+        ids = ids.union( temp )
 
     if len(ids) > 0:
         if config.LOG_DEBUG:
@@ -111,9 +101,9 @@ def process_news(news, mh, lsh):
         rdb.sadd('metrics', json.dumps(metrics))
 
     # save input news to Redis
-    rdb.zadd("newsId", news['timestamp'], news['id'])
+    rdb.zadd("newsId", int(news['timestamp']), news['id'])
     for tag in news['tag_company']:
-        rdb.sadd("lsh:{}".format(tag), news['id'])
+        rdb.zadd("lsh:{}".format(tag), int(news['timestamp']), news['id'])
         rdb.sadd("lsh_keys", "lsh:{}".format(tag))
     rdb.hmset("news:{}".format(news['id']),
                 {

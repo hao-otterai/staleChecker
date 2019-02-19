@@ -51,8 +51,8 @@ def store_lsh_redis_by_tag(iter):
                 "lsh_hash": ','.join(str(x) for x in q.lsh_hash)})
         #if config.LOG_DEBUG: print(q_json)
         for tag in q.tag_company:
-            # rdb.zadd("lsh:{}".format(tag), q.timestamp, q_json)
-            rdb.sadd("lsh:{}".format(tag), q.id)
+            rdb.zadd("lsh:{}".format(tag), int(q.timestamp), q_json)
+            #rdb.sadd("lsh:{}".format(tag), q.id)
             rdb.sadd("lsh_keys", "lsh:{}".format(tag))
         #except Exception as e:
         #    print("ERROR: failed to save tag {0} to Redis".format(tag))
@@ -187,7 +187,9 @@ def find_similar_cands_per_tag(tag, mh, lsh):
 
     # get the dataframe for all news of given tag. id and lsh_hash columns loaded from Redis.
     tq = []
-    for id in rdb.smembers("lsh:{}".format(tag)):
+    # ids = rdb.smembers("lsh:{0}".format(tag))
+    ids = rdb.zrangebyscore("lsh:{0}".format(tag), '-inf', '+inf', withscores=False)
+    for id in ids:
         lsh_hash = rdb.hget("news:{}".format(id), 'lsh_hash')
         if lsh_hash is not None:
             news = {}
@@ -259,7 +261,7 @@ def main():
     # Fetch all tags from lsh_keys set
     for lsh_key in rdb.sscan_iter("lsh_keys", match="*", count=500):
         tag = lsh_key.replace("lsh:", "")
-        tq_table_size = rdb.scard("lsh:{0}".format(tag))
+        tq_table_size = rdb.zcard("lsh:{0}".format(tag))
         if tq_table_size < 2: continue
 
         find_similar_cands_per_tag(tag, mh, lsh)

@@ -114,6 +114,8 @@ def singleNewsView(news_id):
 def singleTagView(tag_name):
     rdb = redis.StrictRedis(REDIS_SERVER, port=6379, db=0)
     output = []
-    for id in rdb.smembers("lsh:{0}".format(str(tag_name))):
+    # ids = rdb.smembers("lsh:{0}".format(str(tag_name)))
+    ids = rdb.zrevrangebyscore("lsh:{0}".format(str(tag_name)), '+inf', '-inf', withscores=False)
+    for id in ids:
         output.append(getNewsDetails(id))
     return render_template("news_list.html", dup_cands=output)
