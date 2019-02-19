@@ -29,5 +29,7 @@ In this project, I implemented a customized MinHash - Locality Sensitive Hashing
 
 ### references
 [1] [Financial research publication: When Can the Market Identify Old News](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2433234)
+
 [2] [A blog on Locality Sensitive Hashing](https://towardsdatascience.com/understanding-locality-sensitive-hashing-49f6d1f6134)
+
 [3] [Detecting Abuse at Scale: Locality Sensitive Hashing at Uber Engineering](https://eng.uber.com/lsh/)
